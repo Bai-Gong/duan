@@ -1,0 +1,206 @@
+/* 编码队列表（中区）：工具栏 + 表格 + 状态色标 + 进度条。视觉取值一律 fang token。 */
+
+.queue-table-panel > .fang-dock-panel__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.queue-table {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fang-space-2);
+  height: 100%;
+  min-height: 0;
+}
+
+.queue-table__toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--fang-space-3);
+  min-width: 0;
+}
+
+.queue-table__current {
+  font-size: var(--fang-font-size-sm);
+  color: var(--fang-color-text-secondary);
+  white-space: nowrap;
+}
+
+.queue-table__note {
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-warning);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-table__hint {
+  margin-left: auto;
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-text-muted);
+  white-space: nowrap;
+}
+
+.queue-table__empty {
+  margin: var(--fang-space-4) 0;
+  color: var(--fang-color-text-muted);
+}
+
+.queue-table__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--fang-color-border);
+  border-radius: var(--fang-radius-sm);
+  background: var(--fang-color-bg-raised);
+}
+
+.queue-table__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fang-font-size-sm);
+}
+
+.queue-table__table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--fang-space-2);
+  border-bottom: 1px solid var(--fang-color-border);
+  background: var(--fang-color-bg-overlay);
+  color: var(--fang-color-text-secondary);
+  font-size: var(--fang-font-size-xs);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.queue-table__table td {
+  padding: var(--fang-space-2);
+  border-bottom: 1px solid var(--fang-color-border);
+  color: var(--fang-color-text);
+  vertical-align: middle;
+}
+
+.queue-row {
+  cursor: pointer;
+}
+
+.queue-row:hover td {
+  background: var(--fang-color-hover);
+}
+
+.queue-row--running td {
+  background: var(--fang-color-selected);
+}
+
+.queue-table__name,
+.queue-table__out {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.queue-table__preset {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fang-color-text-secondary);
+}
+
+.queue-table__th-progress,
+.queue-table__td-progress {
+  min-width: 140px;
+}
+
+.queue-table__th-ops {
+  width: 1%;
+  white-space: nowrap;
+}
+
+.queue-table__ops {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.queue-table__footer {
+  flex: none;
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-text-muted);
+  user-select: none;
+}
+
+/* —— 状态色标（产品分析「状态色标」列） —— */
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: var(--fang-space-2);
+  border-radius: 50%;
+  background: var(--fang-color-text-muted);
+  vertical-align: middle;
+}
+
+.status-dot--waiting {
+  background: var(--fang-color-text-muted);
+}
+
+.status-dot--running {
+  background: var(--fang-color-accent);
+  box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.25); /* --fang-color-accent 光环 */
+}
+
+.status-dot--done {
+  background: var(--fang-color-success);
+}
+
+.status-dot--failed {
+  background: var(--fang-color-danger);
+}
+
+.status-dot--canceled {
+  background: var(--fang-color-warning);
+}
+
+.status-dot--skipped {
+  background: transparent;
+  border: 1.5px solid var(--fang-color-text-muted);
+}
+
+/* —— 进度条 —— */
+.qprogress {
+  display: inline-block;
+  vertical-align: middle;
+  width: 84px;
+  height: 6px;
+  margin-right: var(--fang-space-2);
+  border-radius: var(--fang-radius-sm);
+  background: var(--fang-color-bg-overlay);
+  overflow: hidden;
+}
+
+.qprogress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fang-color-accent);
+  transition: width 120ms linear;
+}
+
+.queue-row--done .qprogress__fill {
+  background: var(--fang-color-success);
+}
+
+.queue-row--failed .qprogress__fill,
+.queue-row--canceled .qprogress__fill {
+  background: var(--fang-color-danger);
+}
+
+.qprogress__label {
+  font-family: var(--fang-font-mono);
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-text-secondary);
+}

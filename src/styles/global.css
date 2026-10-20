@@ -1,5 +1,5 @@
-/* 百工·锻 全局样式。骨架期尚未接 fang 外壳（ThemeProvider / tokens.css），
-   暂用原生样式保证可构建；接入 fang 后视觉取值切换为 var(--fang-*) 设计 token。 */
+/* 百工·锻 全局样式：视觉取值一律 var(--fang-*) 设计 token（AppShell 引入 tokens.css
+   后生效），禁裸色值。此处只放外壳公共件，各面板样式随 features/ 落地自包含。 */
 
 html,
 body,
@@ -9,32 +9,200 @@ body,
 }
 
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-  font-size: 14px;
-  color: #d4d4d4;
-  background: #1e1e1e;
-  overflow: hidden; /* 桌面应用形态：页面自身不滚动 */
+  font-family: var(--fang-font-family);
+  font-size: var(--fang-font-size-md);
+  color: var(--fang-color-text);
+  background: var(--fang-color-bg);
+  overflow: hidden; /* 桌面应用形态：页面自身不滚动，滚动收敛在各面板内 */
 }
 
-.app {
-  height: 100%;
+/* 外壳：顶栏 + 停靠区 纵向铺满 */
+.app-shell {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+/* —— 顶栏 —— */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--fang-space-3);
+  padding: var(--fang-space-2) var(--fang-space-4);
+  border-bottom: 1px solid var(--fang-color-border);
+  background: var(--fang-color-bg-raised);
+  user-select: none;
+  flex: none;
+}
+
+.top-bar__app {
+  font-weight: 600;
+}
+
+.top-bar__sub {
+  color: var(--fang-color-text-secondary);
+}
+
+.top-bar__divider {
+  width: 1px;
+  height: 14px;
+  background: var(--fang-color-border);
+}
+
+.top-bar__actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fang-space-3);
+  min-width: 0;
+}
+
+.top-bar__hint {
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-text-muted);
+}
+
+/* —— 占位文案（M1/M2 各列面板落地后移除） —— */
+.panel-placeholder {
+  margin: 0;
+  color: var(--fang-color-text-muted);
+}
+
+/* —— 通用按钮（token 化，供各面板共用；与 jian 同款） —— */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fang-space-1);
+  padding: var(--fang-space-1) var(--fang-space-3);
+  border: 1px solid var(--fang-color-border);
+  border-radius: var(--fang-radius-sm);
+  background: var(--fang-color-bg-raised);
+  color: var(--fang-color-text);
+  font: var(--fang-font-size-sm)/1.4 var(--fang-font-family);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--fang-color-bg-overlay);
+  border-color: var(--fang-color-border-strong);
+}
+
+.btn:disabled {
+  color: var(--fang-color-text-muted);
+  cursor: default;
+}
+
+.btn--primary {
+  background: var(--fang-color-accent);
+  border-color: var(--fang-color-accent);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--fang-color-accent-hover);
+  border-color: var(--fang-color-accent-hover);
+}
+
+.btn--sm {
+  padding: 2px var(--fang-space-2);
+  font-size: var(--fang-font-size-xs);
+}
+
+/* 图标按钮：队列表行操作 / 弹层关闭位 */
+.icon-btn {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  user-select: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--fang-radius-sm);
+  background: transparent;
+  color: var(--fang-color-text-secondary);
+  cursor: pointer;
 }
 
-.app__title {
-  margin: 0;
-  font-size: 28px;
+.icon-btn:hover:not(:disabled) {
+  background: var(--fang-color-hover);
+  color: var(--fang-color-text);
+}
+
+.icon-btn:disabled {
+  color: var(--fang-color-text-muted);
+  cursor: default;
+}
+
+.icon-btn--sm {
+  width: 22px;
+  height: 22px;
+}
+
+/* —— 模态弹层（导出设置 / 预览监视器共用外壳） —— */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--fang-space-6);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.modal-card {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 2 * var(--fang-space-6));
+  border: 1px solid var(--fang-color-border-strong);
+  border-radius: var(--fang-radius-lg);
+  background: var(--fang-color-bg-raised);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.modal-card__header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--fang-space-2);
+  padding: var(--fang-space-2) var(--fang-space-3);
+  border-bottom: 1px solid var(--fang-color-border);
+  background: var(--fang-color-bg-overlay);
+}
+
+.modal-card__title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fang-font-size-sm);
   font-weight: 600;
-  letter-spacing: 2px;
+  color: var(--fang-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.app__subtitle {
-  margin: 0;
-  font-size: 13px;
-  opacity: 0.6;
+.modal-card__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--fang-space-3);
+}
+
+.modal-card__footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--fang-space-3);
+  padding: var(--fang-space-2) var(--fang-space-3);
+  border-top: 1px solid var(--fang-color-border);
+}
+
+.modal-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--fang-space-2);
+  margin-left: auto;
 }

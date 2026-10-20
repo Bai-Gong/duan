@@ -1,0 +1,223 @@
+/* 正在编码面板（右区）：当前项卡片 + 汇总。视觉取值一律 fang token。 */
+
+.encoding-panel > .fang-dock-panel__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.encoding {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fang-space-3);
+  height: 100%;
+  min-height: 0;
+}
+
+.encoding__current {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fang-space-2);
+}
+
+.encoding__thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fang-radius-sm);
+  background: var(--fang-color-bg-overlay);
+  overflow: hidden;
+}
+
+.encoding__thumb--failed {
+  outline: 1px dashed var(--fang-color-border-strong);
+}
+
+.encoding__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.encoding__thumb-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fang-space-2);
+  color: var(--fang-color-text-muted);
+  font-size: var(--fang-font-size-sm);
+}
+
+.encoding__thumb-note--audio {
+  flex-direction: column;
+  gap: var(--fang-space-1);
+}
+
+.encoding__kind-badge {
+  position: absolute;
+  top: var(--fang-space-1);
+  right: var(--fang-space-1);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px var(--fang-space-2);
+  border-radius: var(--fang-radius-sm);
+  background: var(--fang-color-bg-overlay);
+  color: var(--fang-color-text-secondary);
+  font-size: var(--fang-font-size-xs);
+}
+
+.encoding__name {
+  border: none;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  font-size: var(--fang-font-size-sm);
+  color: var(--fang-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.encoding__name:hover {
+  color: var(--fang-color-accent-hover);
+}
+
+.encoding__preset {
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 大号进度 */
+.encoding__big-pct {
+  display: flex;
+  align-items: baseline;
+  gap: var(--fang-space-1);
+  font-family: var(--fang-font-mono);
+  color: var(--fang-color-text);
+}
+
+.encoding__pct-num {
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.encoding__pct-unit {
+  font-size: var(--fang-font-size-lg);
+  color: var(--fang-color-text-secondary);
+}
+
+.encoding__bar {
+  height: 8px;
+  border-radius: var(--fang-radius-sm);
+  background: var(--fang-color-bg-overlay);
+  overflow: hidden;
+}
+
+.encoding__bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--fang-color-accent);
+  transition: width 120ms linear;
+}
+
+.encoding__times {
+  display: flex;
+  align-items: center;
+  gap: var(--fang-space-2);
+  font-family: var(--fang-font-mono);
+  font-size: var(--fang-font-size-sm);
+  color: var(--fang-color-text-secondary);
+}
+
+.encoding__times-sep {
+  color: var(--fang-color-text-muted);
+}
+
+.encoding__eta {
+  margin-left: auto;
+  font-family: var(--fang-font-family);
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-text-muted);
+  white-space: nowrap;
+}
+
+/* 空闲/完成反馈 */
+.encoding__idle {
+  margin: 0;
+  color: var(--fang-color-text-muted);
+  font-size: var(--fang-font-size-sm);
+}
+
+.encoding__banner {
+  margin: 0;
+  padding: var(--fang-space-3);
+  border-radius: var(--fang-radius-sm);
+  font-size: var(--fang-font-size-sm);
+  font-weight: 600;
+  text-align: center;
+}
+
+.encoding__banner--done {
+  background: var(--fang-color-success);
+  color: #10230f; /* 深底绿字反白，token 无对应前景色，用固定深色保证对比 */
+}
+
+.encoding__banner--mixed {
+  background: var(--fang-color-warning);
+  color: #241c05;
+}
+
+/* 汇总 */
+.encoding__summary {
+  margin-top: auto; /* 钉在面板底部 */
+  padding-top: var(--fang-space-2);
+  border-top: 1px solid var(--fang-color-border);
+}
+
+.encoding__summary-title {
+  margin: 0 0 var(--fang-space-2);
+  font-size: var(--fang-font-size-xs);
+  font-weight: 600;
+  color: var(--fang-color-text-secondary);
+  user-select: none;
+}
+
+.encoding__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--fang-space-2) var(--fang-space-1);
+  margin: 0;
+}
+
+.encoding__summary-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.encoding__summary-grid dt {
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-text-muted);
+}
+
+.encoding__summary-grid dd {
+  margin: 0;
+  font-family: var(--fang-font-mono);
+  font-size: var(--fang-font-size-md);
+  color: var(--fang-color-text);
+}
+
+.encoding__done-label {
+  color: var(--fang-color-success) !important;
+}
+
+.encoding__failed-label {
+  color: var(--fang-color-danger) !important;
+}

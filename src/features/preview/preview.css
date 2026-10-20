@@ -1,0 +1,108 @@
+/* 预览监视器（点选队列项弹层）：代表帧 + 元数据表。弹层外壳（.modal-*）在 global.css。 */
+
+.preview-monitor {
+  width: min(680px, calc(100vw - 64px));
+}
+
+.preview-monitor__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fang-space-3);
+  max-height: min(72vh, 640px);
+}
+
+.preview-monitor__frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--fang-radius-sm);
+  background: var(--fang-color-bg-overlay);
+  overflow: hidden;
+  flex: none;
+}
+
+.preview-monitor__frame--failed {
+  outline: 1px dashed var(--fang-color-border-strong);
+}
+
+.preview-monitor__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.preview-monitor__frame-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fang-space-2);
+  color: var(--fang-color-text-muted);
+  font-size: var(--fang-font-size-sm);
+}
+
+.preview-monitor__frame-note--audio {
+  flex-direction: column;
+  gap: var(--fang-space-2);
+}
+
+/* 元数据表：两列 dl */
+.preview-monitor__meta {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) minmax(0, 1fr);
+  gap: var(--fang-space-1) var(--fang-space-3);
+  margin: 0;
+  overflow: auto;
+  min-height: 0;
+}
+
+.preview-monitor__meta dt {
+  font-size: var(--fang-font-size-sm);
+  color: var(--fang-color-text-muted);
+  white-space: nowrap;
+}
+
+.preview-monitor__meta dd {
+  margin: 0;
+  font-family: var(--fang-font-mono);
+  font-size: var(--fang-font-size-sm);
+  color: var(--fang-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 失败详情 */
+.preview-monitor__error {
+  padding: var(--fang-space-2);
+  border: 1px solid var(--fang-color-danger);
+  border-radius: var(--fang-radius-sm);
+  flex: none;
+}
+
+.preview-monitor__error-title {
+  margin: 0 0 var(--fang-space-1);
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-danger);
+}
+
+.preview-monitor__error-body {
+  margin: 0;
+  max-height: 120px;
+  overflow: auto;
+  font-family: var(--fang-font-mono);
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-text-secondary);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* 底部状态 */
+.preview-monitor__status {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--fang-font-size-sm);
+  color: var(--fang-color-text-secondary);
+  margin-right: auto;
+}

@@ -1,0 +1,108 @@
+/* 导出设置对话框：分组表单。弹层外壳（.modal-*）在 global.css。 */
+
+.export-settings {
+  width: min(560px, calc(100vw - 64px));
+}
+
+.export-settings__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fang-space-3);
+}
+
+.export-settings__group {
+  margin: 0;
+  padding: var(--fang-space-2) var(--fang-space-3);
+  border: 1px solid var(--fang-color-border);
+  border-radius: var(--fang-radius-sm);
+}
+
+.export-settings__group legend {
+  padding: 0 var(--fang-space-2);
+  font-size: var(--fang-font-size-xs);
+  font-weight: 600;
+  color: var(--fang-color-text-secondary);
+  user-select: none;
+}
+
+.export-settings__legend-check,
+.export-settings__check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fang-space-1);
+  cursor: pointer;
+}
+
+/* —— 表单行（对话框内共用） —— */
+.form-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fang-space-3);
+  margin: var(--fang-space-1) 0;
+  min-height: 30px;
+}
+
+.form-row__label {
+  flex: none;
+  width: 88px;
+  font-size: var(--fang-font-size-sm);
+  color: var(--fang-color-text-secondary);
+}
+
+.form-row select,
+.form-row input[type="number"],
+.export-settings__save-name input[type="text"] {
+  padding: var(--fang-space-1) var(--fang-space-2);
+  border: 1px solid var(--fang-color-border);
+  border-radius: var(--fang-radius-sm);
+  background: var(--fang-color-bg);
+  color: var(--fang-color-text);
+  font: var(--fang-font-size-sm)/1.4 var(--fang-font-family);
+}
+
+.form-row select:focus,
+.form-row input:focus,
+.export-settings__save-name input:focus {
+  border-color: var(--fang-color-accent);
+  outline: none;
+}
+
+.form-row input[type="number"] {
+  width: 110px;
+  font-family: var(--fang-font-mono);
+}
+
+.form-row input[type="checkbox"] {
+  accent-color: var(--fang-color-accent);
+}
+
+.form-row__inline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fang-space-2);
+  min-width: 0;
+}
+
+.form-row__unit {
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-text-muted);
+  white-space: nowrap;
+}
+
+.form-row__readonly {
+  font-size: var(--fang-font-size-sm);
+  color: var(--fang-color-text);
+}
+
+/* —— 底部：预设名 + 动作 —— */
+.export-settings__save-name {
+  display: flex;
+  align-items: center;
+  gap: var(--fang-space-2);
+  margin-right: auto;
+  min-width: 0;
+}
+
+.export-settings__save-name input[type="text"] {
+  width: 180px;
+}
