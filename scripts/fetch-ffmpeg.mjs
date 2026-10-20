@@ -11,7 +11,7 @@
  *
  * 目录解析以脚本自身位置为基准（不依赖 cwd，可从仓库根调用）。
  * 来源：GitHub BtbN/FFmpeg-Builds 的 latest release（win64 gpl 完整构建 zip，非 shared）。
- * 解压用系统自带 tar（Windows 10+ 的 bsdtar 原生支持 zip）。
+ * 解压：Windows 用系统自带 bsdtar（原生支持 zip），Linux/macOS 用 unzip。
  *
  * 令牌：读 GITHUB_TOKEN / GH_TOKEN 环境变量（前者优先），有则在查询 latest release
  * 的请求上加 Authorization 头，无则匿名。GitHub Actions 里透传
@@ -128,10 +128,15 @@ async function main() {
   if (!zipRes.ok) throw new Error(`下载失败：HTTP ${zipRes.status}`);
   await writeFile(zipPath, Buffer.from(await zipRes.arrayBuffer()));
 
-  // 3. tar 解 zip，从解出的目录树里捞两个 exe
+  // 3. 解 zip，从解出的目录树里捞两个 exe
+  //    Windows 的 bsdtar 原生认 zip；Linux/macOS 的 GNU tar 不认，改用 unzip（CI runner 预装）。
   const extractDir = path.join(tmpDir, "x");
   await mkdir(extractDir, { recursive: true });
-  await execFileAsync("tar", ["-xf", zipPath, "-C", extractDir]);
+  if (process.platform === "win32") {
+    await execFileAsync("tar", ["-xf", zipPath, "-C", extractDir]);
+  } else {
+    await execFileAsync("unzip", ["-q", zipPath, "-d", extractDir]);
+  }
   const srcFfmpeg = await findFile(extractDir, "ffmpeg.exe");
   const srcFfprobe = await findFile(extractDir, "ffprobe.exe");
   if (!srcFfmpeg || !srcFfprobe) throw new Error("解压后找不到 ffmpeg.exe / ffprobe.exe");
