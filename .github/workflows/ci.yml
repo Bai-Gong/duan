@@ -72,5 +72,14 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # tauri.conf.json 的 bundle.resources 映射 binaries/*，tauri-build 对空 glob 直接失败；
+      # 二进制被 .gitignore 排除，runner 上须先下载（与 qa/release 打包 job 同一做法）。
+      - name: 下载 ffmpeg（避免 resources 空匹配）
+        run: node scripts/fetch-ffmpeg.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml --locked
