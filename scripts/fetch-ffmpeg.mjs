@@ -2,6 +2,7 @@
 /**
  * 下载 FFmpeg（ffmpeg.exe + ffprobe.exe）到 src-tauri/binaries/，供运行时三档定位与打包资源用。
  * 移植自 jian/scripts/fetch-ffmpeg.mjs，增强：GITHUB_TOKEN 支持 + --check 自检模式。
+ * 本机无 PATH ffmpeg，此为开发主路径；匿名额度 60 次/时已实测耗尽，优先设 token。
  *
  * Usage:
  *   node scripts/fetch-ffmpeg.mjs            # 两个 exe 已齐则跳过（幂等）

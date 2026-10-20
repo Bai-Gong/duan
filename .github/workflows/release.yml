@@ -1,6 +1,8 @@
-# 百工发布 —— main 分支：稳定分支检查（文档阶段仓库）。
-# 三分支分工：develop 门禁 / qa 复跑检查 / main 本文件。
-# 正式发布（tag + GitHub Release）随代码落地后启用。
+# 百工·锻发布 —— main 分支：门禁复跑 + Windows 正式安装包 + GitHub Release。
+# Release 以 tauri.conf.json 的版本号打 tag（v{version}）；
+# 每次正式发布前请先在 main 上提升版本号，未提升时将更新同名 Release。
+# tauri.conf.json 已映射 bundle.resources binaries/*（ffmpeg sidecar 进安装包），
+# runner 无本机 ffmpeg，打包前必须先跑 fetch-ffmpeg 落位两 exe（幂等），否则 resources glob 空匹配。
 
 name: 发布流水线 (main)
 
@@ -9,13 +11,123 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  docs-gate:
-    name: 稳定分支结构检查
+  web-gate:
+    name: 前端门禁 (tsc + vite build + vitest)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 结构完整性检查
+      # fang 兄弟仓库检出（原因见 ci.yml 同名步骤注释）
+      - name: 检出 fang（alias 联调的兄弟仓库）
+        uses: actions/checkout@v4
+        with:
+          repository: Bai-Gong/fang
+          ref: main
+          path: fang
+      # checkout 只允许工作区内路径，检出到 fang/ 后挪到兄弟目录 ../fang
+      - name: fang 挪到兄弟目录
+        run: mv fang ../fang
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # fang 源码里的 import "react" 从 fang 自己的 node_modules 向上解析，裸检出会 TS2307
+      - name: 安装 fang 依赖
+        run: npm ci --prefix ../fang
+      - name: 安装并构建、测试
         run: |
-          test -f README.md
-          echo "文档阶段仓库：仅确认结构完整，正式发布随代码落地后启用。"
+          npm ci
+          npm run build
+          npm test
+
+  rust-gate:
+    name: Rust 门禁 (cargo check)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 安装 Tauri 系统依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev \
+            libxdo-dev libayatana-appindicator3-dev libssl-dev pkg-config
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+
+  release-app-windows:
+    name: 正式发布 (Windows 安装包 + Release)
+    needs: [web-gate, rust-gate]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      # fang 兄弟仓库检出：tauri build 的 beforeBuildCommand 会跑 npm run build（tsc 需 ../fang）
+      - name: 检出 fang（alias 联调的兄弟仓库）
+        uses: actions/checkout@v4
+        with:
+          repository: Bai-Gong/fang
+          ref: main
+          path: fang
+      # checkout 只允许工作区内路径，检出到 fang/ 后挪到兄弟目录 ../fang
+      - name: fang 挪到兄弟目录
+        run: mv fang ../fang
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: 安装 fang 依赖
+        run: npm ci --prefix ../fang
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: 安装依赖
+        run: npm ci
+      # ffmpeg sidecar 落位（脚本幂等，已存在则跳过）。
+      # 透传 Actions 自带 token：GitHub API 匿名 60 次/时/IP 在共享出口 IP 的托管 runner 上
+      # 极易撞限（本机已实测 403 耗尽）；自带 token 额度 1000 次/时/仓库，单次打包仅需
+      # 1 次 release 查询。下载本体走 browser_download_url 不占 API 限流。
+      - name: 下载 ffmpeg sidecar
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/fetch-ffmpeg.mjs
+      # 只产 NSIS 安装包：WiX(MSI) 的 codepage 1252 无法编码中文产品名（zhi 仓库实测 LGHT0311）
+      - name: 构建 Tauri 安装包
+        run: npm run tauri build -- --bundles nsis
+      - name: 读取版本号
+        id: ver
+        shell: bash
+        run: |
+          VER=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+      # GitHub Release 资产文件名会丢弃非 ASCII 字符（zhi 实测"百工纸"被剥成 "_0.1.0_x64-setup.exe"）。
+      # 故先重命名为 ASCII 文件名，再用 gh 的"文件#label"语法在 Release 页面保留中文显示名。
+      - name: 重命名安装包为 ASCII 文件名
+        shell: bash
+        env:
+          VER: ${{ steps.ver.outputs.version }}
+        run: mv "src-tauri/target/release/bundle/nsis/百工锻_${VER}_x64-setup.exe" "src-tauri/target/release/bundle/nsis/BaiGongDuan_${VER}_x64-setup.exe"
+      - name: 创建 GitHub Release 并上传安装包
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VER: ${{ steps.ver.outputs.version }}
+        run: |
+          TAG="v${VER}"
+          NOTES="正式发布（由 main 分支流水线自动生成）。
+          发布前请确认已在 main 上提升 tauri.conf.json 版本号。"
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "${{ github.event.repository.name }} ${TAG}" \
+              --notes "$NOTES"
+          fi
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" \
+            "src-tauri/target/release/bundle/nsis/BaiGongDuan_${VER}_x64-setup.exe#百工锻_${VER}_x64-setup.exe" \
+            --clobber
