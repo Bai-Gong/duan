@@ -1,0 +1,40 @@
+/* 百工·锻 全局样式。骨架期尚未接 fang 外壳（ThemeProvider / tokens.css），
+   暂用原生样式保证可构建；接入 fang 后视觉取值切换为 var(--fang-*) 设计 token。 */
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  color: #d4d4d4;
+  background: #1e1e1e;
+  overflow: hidden; /* 桌面应用形态：页面自身不滚动 */
+}
+
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  user-select: none;
+}
+
+.app__title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+.app__subtitle {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.6;
+}
