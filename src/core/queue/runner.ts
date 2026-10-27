@@ -16,6 +16,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { buildTranscodeArgs } from "../preset/buildTranscodeArgs";
+import { buildYeTranscodeParams } from "../preset/buildYeTranscodeParams";
 import type { Preset } from "../preset/types";
 import { useQueueStore } from "./store";
 import type { QueueItem } from "./types";
@@ -30,9 +31,14 @@ export interface TranscodeProgressEvent {
 /** 进度写 store 的最小间隔（ms）；窗口内的多次事件合并为最后一次。 */
 export const PROGRESS_THROTTLE_MS = 100;
 
+/** 转码引擎二选一（M3 接线轨）：ffmpeg＝子进程，ye＝进程内（H.264+音频直通）。 */
+export type TranscodeEngine = "ffmpeg" | "ye";
+
 export interface StartQueueOptions {
   /** presetId→Preset 解析（内置+自建全集查找）；由接线层（TopBar/导入编排）注入。 */
   resolvePreset(id: string): Preset | undefined;
+  /** 当前引擎选择（接线层注入，避免队列引擎反向依赖预设 store）；缺省 ffmpeg。 */
+  getEngine?(): TranscodeEngine;
 }
 
 // —— runner 会话态（模块级单例：单 worker，同一时刻至多一个循环） ——
@@ -40,8 +46,10 @@ export interface StartQueueOptions {
 let loopActive = false;
 /** stopQueue 置位：当前项了结后循环不再取下一项（剩余 waiting 原地保留，可再启动）。 */
 let stopRequested = false;
-/** 取消标记：invoke cancel_transcode 前先加，reject 时先查——命中即「用户取消」。 */
+/** 取消标记：invoke cancel 前先加，reject 时先查——命中即「用户取消」。 */
 const cancelFlags = new Set<string>();
+/** 当前 running 项走的引擎：cancelJob 据此路由到对应取消命令（两引擎句柄表独立）。 */
+let activeEngine: TranscodeEngine | null = null;
 // —— 进度节流缓冲（单 worker，同一时刻至多一个合法 jobId 的事件流） ——
 let lastFlushAt = 0;
 let buffered: { jobId: string; timeUs: number } | null = null;
@@ -52,6 +60,7 @@ export function resetRunnerState(): void {
   loopActive = false;
   stopRequested = false;
   cancelFlags.clear();
+  activeEngine = null;
   lastFlushAt = 0;
   buffered = null;
   if (flushTimer !== null) {
@@ -103,8 +112,9 @@ export function stopQueue(): void {
 }
 
 /**
- * 取消一个队列项：waiting 直接落 canceled；running 项先打标记再 cancel_transcode
- * （kill 送达后 run_transcode 以非零退出 reject，标记命中才落 canceled 并忽略 stderr）。
+ * 取消一个队列项：waiting 直接落 canceled；running 项先打标记再按当前引擎
+ * 调对应取消命令（ffmpeg＝kill 子进程；ye＝置 AtomicBool 旗标）。两引擎取消后
+ * 的非零结果都走 reject，标记命中才落 canceled 并忽略错误详情。
  * fire-and-forget：不阻塞调用方，结果经 reject 链路回写 store。
  */
 export function cancelJob(jobId: string): void {
@@ -116,8 +126,9 @@ export function cancelJob(jobId: string): void {
   }
   if (item.status !== "running") return;
   cancelFlags.add(jobId);
-  void invoke<null>("cancel_transcode", { jobId }).catch(() => {
-    // kill 未送达（进程多半已自行结束）：撤标记，让自然结果说了算，
+  const command = activeEngine === "ye" ? "cancel_transcode_ye" : "cancel_transcode";
+  void invoke<null>(command, { jobId }).catch(() => {
+    // 取消未送达（转码多半已自行结束）：撤标记，让自然结果说了算，
     // 避免把自然失败误判成「用户取消」。
     cancelFlags.delete(jobId);
   });
@@ -132,6 +143,8 @@ async function runOne(item: QueueItem, options: StartQueueOptions): Promise<void
   const current = useQueueStore.getState().items.find((i) => i.id === item.id);
   if (!current) return;
 
+  const engine: TranscodeEngine = options.getEngine?.() ?? "ffmpeg";
+  activeEngine = engine;
   try {
     const preset = options.resolvePreset(current.presetId);
     if (!preset) {
@@ -139,31 +152,53 @@ async function runOne(item: QueueItem, options: StartQueueOptions): Promise<void
       return;
     }
     const merged = current.override ? { ...preset, ...current.override } : preset;
-    // buildTranscodeArgs 消费 preset/types 的 MediaInfo 子集（含 path、不含 duration 等），
-    // 队列项的完整版 mediaInfo（core/media/probe）是它的超集，补上 path 即可
-    const built = buildTranscodeArgs(merged, { ...current.mediaInfo, path: current.path }, current.outPath);
-    if (!built.ok) {
-      // 图片素材（MVP 边界）与形状非法预设：翻译层明确拒绝，落 failed 不硬编
-      store.setResult(current.id, { status: "failed", error: built.error });
-      return;
+    if (engine === "ye") {
+      // ye 引擎：preset+源素材 → run_transcode_ye 参数面（能力面外翻译层明确拒绝）。
+      // 队列项 mediaInfo（core/media/probe）含 width/videoCodec，是翻译层所需全集。
+      const built = buildYeTranscodeParams(merged, current.mediaInfo);
+      if (!built.ok) {
+        store.setResult(current.id, { status: "failed", error: built.error });
+        return;
+      }
+      await invoke<null>("run_transcode_ye", {
+        jobId: current.id,
+        inputPath: current.path,
+        outPath: current.outPath,
+        width: built.width,
+        height: built.height,
+        crf: built.crf,
+        totalUs: Math.max(0, Math.round(current.mediaInfo.durationUs)),
+      });
+    } else {
+      // buildTranscodeArgs 消费 preset/types 的 MediaInfo 子集（含 path、不含 duration 等），
+      // 队列项的完整版 mediaInfo（core/media/probe）是它的超集，补上 path 即可
+      const built = buildTranscodeArgs(merged, { ...current.mediaInfo, path: current.path }, current.outPath);
+      if (!built.ok) {
+        // 图片素材（MVP 边界）与形状非法预设：翻译层明确拒绝，落 failed 不硬编
+        store.setResult(current.id, { status: "failed", error: built.error });
+        return;
+      }
+      await invoke<null>("run_transcode", {
+        jobId: current.id,
+        args: built.args,
+        outPath: current.outPath,
+        totalUs: Math.max(0, Math.round(current.mediaInfo.durationUs)),
+      });
     }
-    await invoke<null>("run_transcode", {
-      jobId: current.id,
-      args: built.args,
-      outPath: current.outPath,
-      totalUs: Math.max(0, Math.round(current.mediaInfo.durationUs)),
-    });
-    // 进程已自然结束，作废残留标记（用户在完成前一瞬点取消的极端窗口：产物已成，事实优先）
+    // 转码已自然结束，作废残留标记（用户在完成前一瞬点取消的极端窗口：产物已成，事实优先）
     cancelFlags.delete(current.id);
     store.setResult(current.id, { status: "done" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (cancelFlags.delete(current.id)) {
-      // 命中取消标记：kill 后的非零退出是取消的正常收尾，stderr 是噪音，不落库
+      // 命中取消标记：取消后的非零结果是取消的正常收尾（kill 退出码/Cancelled 皆然），
+      // 错误详情是噪音，不落库
       store.setResult(current.id, { status: "canceled" });
     } else {
       store.setResult(current.id, { status: "failed", error: message });
     }
+  } finally {
+    activeEngine = null;
   }
 }
 

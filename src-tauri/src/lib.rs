@@ -1,8 +1,13 @@
 // 百工·锻：官方插件 + 转码自研命令（ffprobe 探测 / ffmpeg 定位、抽帧、转码执行与取消）。
 // 命令实现见 probe.rs、ffmpeg.rs；转码参数由前端 buildTranscodeArgs 生成，
 // 这里只负责执行、按 jobId 发 transcode-progress 进度事件与取消。
+// ye_engine.rs 是进程内引擎（M3 接线轨）：与 ffmpeg 子进程路径同事件契约，
+// 前端引擎开关二选一（对拍期 ffmpeg 留作 oracle 与回退）。pub 供
+// tests/ye_engine_e2e.rs 直接调 ye_convert 做对拍（ffmpeg/probe 两模块
+// 无此需求，保持私有）。
 mod ffmpeg;
 mod probe;
+pub mod ye_engine;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -17,6 +22,8 @@ pub fn run() {
             ffmpeg::extract_frame,
             ffmpeg::run_transcode,
             ffmpeg::cancel_transcode,
+            ye_engine::run_transcode_ye,
+            ye_engine::cancel_transcode_ye,
         ])
         .run(tauri::generate_context!())
         .expect("error while running duan");

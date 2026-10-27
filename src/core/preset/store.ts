@@ -15,8 +15,13 @@ export interface PresetStoreState {
   customPresets: Preset[];
   /** 收藏的预设 id（内置或自建皆可，预设浏览器置顶展示）。 */
   favorites: string[];
-  /** 默认输出目录；"" ＝未设置（由命名模块按源文件所在目录兜底）。 */
+  /** 默认输出目录；""＝未设置（由命名模块按源文件所在目录兜底）。 */
   defaultOutputDir: string;
+  /**
+   * 转码引擎二选一（M3 接线轨）：ffmpeg＝子进程（回退/oracle），
+   * ye＝进程内（H.264 解码+编码、音频直通；能力面外由翻译层提前拒绝）。
+   */
+  engine: "ffmpeg" | "ye";
 
   /** 入库并返回带 id 的完整预设（id＝crypto.randomUUID）。 */
   addPreset(draft: PresetDraft): Preset;
@@ -26,6 +31,7 @@ export interface PresetStoreState {
   removePreset(id: string): void;
   toggleFavorite(id: string): void;
   setDefaultOutputDir(dir: string): void;
+  setEngine(engine: "ffmpeg" | "ye"): void;
 }
 
 export const PRESET_STORAGE_KEY = "duan.preset";
@@ -36,6 +42,7 @@ export const usePresetStore = create<PresetStoreState>()(
       customPresets: [],
       favorites: [],
       defaultOutputDir: "",
+      engine: "ffmpeg",
 
       addPreset: (draft) => {
         const preset: Preset = { ...draft, id: crypto.randomUUID(), builtin: false };
@@ -68,6 +75,8 @@ export const usePresetStore = create<PresetStoreState>()(
       },
 
       setDefaultOutputDir: (dir) => set({ defaultOutputDir: dir }),
+
+      setEngine: (engine) => set({ engine }),
     }),
     {
       name: PRESET_STORAGE_KEY,
@@ -77,6 +86,7 @@ export const usePresetStore = create<PresetStoreState>()(
         customPresets: s.customPresets,
         favorites: s.favorites,
         defaultOutputDir: s.defaultOutputDir,
+        engine: s.engine,
       }),
     },
   ),

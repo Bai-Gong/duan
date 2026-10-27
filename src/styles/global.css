@@ -63,6 +63,20 @@ body {
   color: var(--fang-color-text-muted);
 }
 
+/* 引擎切换（M3 接线轨）：running 中禁用置灰 */
+.top-bar__engine {
+  font-size: var(--fang-font-size-xs);
+  color: var(--fang-color-text-muted);
+  background: transparent;
+  border: 1px solid var(--fang-color-border);
+  border-radius: var(--fang-radius-sm);
+  padding: 2px 6px;
+}
+
+.top-bar__engine:disabled {
+  opacity: 0.5;
+}
+
 /* —— 占位文案（M1/M2 各列面板落地后移除） —— */
 .panel-placeholder {
   margin: 0;

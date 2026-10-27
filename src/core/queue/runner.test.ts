@@ -3,11 +3,13 @@
  * - 串行单 worker：前一项落终态后才启动下一项；
  * - 取消与失败的可靠区分：取消后 reject 置 canceled 且忽略 stderr；
  * - 取消后仍收到进度事件不写入（入口防御 + 节流补写防御）；
- * - 进度节流（≥100ms 合并）、空队停转、skip/cancel 门禁、stopQueue 语义。
+ * - 进度节流（≥100ms 合并）、空队停转、skip/cancel 门禁、stopQueue 语义；
+ * - 引擎二选一（M3 接线轨）：ye 走 run_transcode_ye、翻译被拒落 failed、
+ *   取消按引擎路由到 cancel_transcode_ye。
  *
- * mock 说明：../preset/buildTranscodeArgs 是虚拟 mock（同时隔离其真实实现，
- * runner 测试只关心「调用了它、拿到了 args」）；zustand 用真实安装依赖，
- * 早期无依赖阶段的迷你 create 顶替 mock 已在集成阶段（M0 落依赖）删除。
+ * mock 说明：../preset/buildTranscodeArgs 与 buildYeTranscodeParams 是虚拟 mock
+ * （同时隔离其真实实现，runner 测试只关心「调用了它、拿到了参数」）；
+ * zustand 用真实安装依赖，早期无依赖阶段的迷你 create 顶替 mock 已在集成阶段（M0 落依赖）删除。
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MediaInfo } from "../media/probe";
@@ -34,12 +36,21 @@ const mocks = vi.hoisted(() => {
       args: ["-y", "-progress", "pipe:1", "-nostats", "D:/out/fake.mp4"],
     }),
   );
-  return { progressHandlerRef, invokeMock, listenMock, buildArgsMock };
+  const buildYeMock = vi.fn(
+    (): { ok: true; width: number | null; height: number | null; crf: number } | { ok: false; error: string } => ({
+      ok: true as const,
+      width: 640,
+      height: 360,
+      crf: 23,
+    }),
+  );
+  return { progressHandlerRef, invokeMock, listenMock, buildArgsMock, buildYeMock };
 });
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invokeMock }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: mocks.listenMock }));
 vi.mock("../preset/buildTranscodeArgs", () => ({ buildTranscodeArgs: mocks.buildArgsMock }));
+vi.mock("../preset/buildYeTranscodeParams", () => ({ buildYeTranscodeParams: mocks.buildYeMock }));
 
 /** 内置预设即真实数据（builtin.ts 已就位），resolvePreset 一查一个准。 */
 const preset = BUILTIN_PRESETS[0];
@@ -78,21 +89,33 @@ function deferred<T>(): Deferred<T> {
   return { promise, resolve, reject };
 }
 
-/** run_transcode 结果挂钩（FIFO：按 armRun 顺序供循环逐项取用），测试手动 resolve/reject 模拟 ffmpeg 结束。 */
+/** run_transcode / run_transcode_ye 结果挂钩（各按 FIFO 供循环取用），测试手动 resolve/reject 模拟转码结束。 */
 const runQueue: Deferred<null>[] = [];
+const runYeQueue: Deferred<null>[] = [];
 mocks.invokeMock.mockImplementation((cmd: string) => {
   if (cmd === "run_transcode") {
     const d = runQueue.shift();
     if (!d) return Promise.reject(new Error("测试未挂钩 run_transcode"));
     return d.promise;
   }
-  if (cmd === "cancel_transcode") return Promise.resolve(null);
+  if (cmd === "run_transcode_ye") {
+    const d = runYeQueue.shift();
+    if (!d) return Promise.reject(new Error("测试未挂钩 run_transcode_ye"));
+    return d.promise;
+  }
+  if (cmd === "cancel_transcode" || cmd === "cancel_transcode_ye") return Promise.resolve(null);
   return Promise.resolve(null);
 });
 
 function armRun(): Deferred<null> {
   const d = deferred<null>();
   runQueue.push(d);
+  return d;
+}
+
+function armRunYe(): Deferred<null> {
+  const d = deferred<null>();
+  runYeQueue.push(d);
   return d;
 }
 
@@ -125,8 +148,10 @@ beforeEach(() => {
   mocks.invokeMock.mockClear();
   mocks.listenMock.mockClear();
   mocks.buildArgsMock.mockClear();
+  mocks.buildYeMock.mockClear();
   mocks.progressHandlerRef.current = null;
   runQueue.length = 0;
+  runYeQueue.length = 0;
 });
 
 describe("startQueue 串行循环", () => {
@@ -302,6 +327,72 @@ describe("进度路由与节流", () => {
     d.resolve(null);
     await done;
     expect(item(id).status).toBe("done");
+  });
+});
+
+describe("ye 引擎分支（M3 接线轨）", () => {
+  it("getEngine=ye 走 run_transcode_ye，参数面对齐契约，不生成 ffmpeg args", async () => {
+    const [id] = addItems(1);
+    const d = armRunYe();
+    const done = startQueue({ resolvePreset: () => preset, getEngine: () => "ye" });
+    await vi.waitFor(() => expect(item(id).status).toBe("running"));
+    d.resolve(null);
+    await done;
+
+    expect(item(id).status).toBe("done");
+    expect(mocks.invokeMock).toHaveBeenCalledWith("run_transcode_ye", {
+      jobId: id,
+      inputPath: item(id).path,
+      outPath: item(id).outPath,
+      width: 640,
+      height: 360,
+      crf: 23,
+      totalUs: 10_000_000,
+    });
+    expect(mocks.buildArgsMock).not.toHaveBeenCalled();
+  });
+
+  it("缺省 getEngine 走 ffmpeg 路径（不传即 ffmpeg，行为向后兼容）", async () => {
+    const [id] = addItems(1);
+    const d = armRun();
+    const done = startQueue({ resolvePreset: () => preset });
+    await vi.waitFor(() => expect(item(id).status).toBe("running"));
+    d.resolve(null);
+    await done;
+
+    const cmds = mocks.invokeMock.mock.calls.map(([cmd]) => cmd);
+    expect(cmds).toContain("run_transcode");
+    expect(cmds).not.toContain("run_transcode_ye");
+  });
+
+  it("ye 翻译被拒（能力面外）落 failed，不 invoke", async () => {
+    addItems(1);
+    mocks.buildYeMock.mockImplementationOnce(() => ({
+      ok: false as const,
+      error: "ye 引擎暂不支持目标码率（真码控后续批次），请把预设切成 CRF 模式或用 ffmpeg 引擎",
+    }));
+    const done = startQueue({ resolvePreset: () => preset, getEngine: () => "ye" });
+    await done;
+    const failed = useQueueStore.getState().items[0];
+    expect(failed.status).toBe("failed");
+    expect(failed.error).toContain("目标码率");
+    expect(mocks.invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("ye 引擎取消路由到 cancel_transcode_ye，reject 置 canceled", async () => {
+    const [id] = addItems(1);
+    const d = armRunYe();
+    const done = startQueue({ resolvePreset: () => preset, getEngine: () => "ye" });
+    await vi.waitFor(() => expect(item(id).status).toBe("running"));
+
+    cancelJob(id);
+    expect(mocks.invokeMock).toHaveBeenCalledWith("cancel_transcode_ye", { jobId: id });
+    // 泵检出取消旗标后的 Cancelled 错误：与真失败同一条 Err 通道，靠标记区分
+    d.reject(new Error("cancelled"));
+    await done;
+
+    expect(item(id).status).toBe("canceled");
+    expect(item(id).error).toBeUndefined();
   });
 });
 
