@@ -37,11 +37,15 @@ const mocks = vi.hoisted(() => {
     }),
   );
   const buildYeMock = vi.fn(
-    (): { ok: true; width: number | null; height: number | null; crf: number } | { ok: false; error: string } => ({
+    (): import("../preset/buildYeTranscodeParams").YeTranscodeBuilt => ({
       ok: true as const,
       width: 640,
       height: 360,
       crf: 23,
+      videoBitrateKbps: null,
+      audioBitrateKbps: 256,
+      stripVideo: false,
+      stripAudio: false,
     }),
   );
   return { progressHandlerRef, invokeMock, listenMock, buildArgsMock, buildYeMock };
@@ -70,6 +74,8 @@ function makeMediaInfo(durationUs: number): MediaInfo {
     videoCodec: "h264",
     audioCodec: "aac",
     container: "mov,mp4,m4a,3gp,3g2,mj2",
+    sampleRate: 48000,
+    channels: 2,
   };
 }
 
@@ -347,6 +353,10 @@ describe("ye 引擎分支（M3 接线轨）", () => {
       width: 640,
       height: 360,
       crf: 23,
+      videoBitrateKbps: null,
+      audioBitrateKbps: 256,
+      stripVideo: false,
+      stripAudio: false,
       totalUs: 10_000_000,
     });
     expect(mocks.buildArgsMock).not.toHaveBeenCalled();

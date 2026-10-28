@@ -144,7 +144,7 @@ describe("presetId 解析（队列引擎对接面）", () => {
 });
 
 describe("持久化（localStorage）", () => {
-  it("partialize：盘上只有三个数据字段，actions 不落盘", () => {
+  it("partialize：盘上只有四个数据字段（含 M3 接线的 engine），actions 不落盘", () => {
     state().addPreset(makeDraft());
     state().toggleFavorite("builtin:mp3-320k");
     state().setDefaultOutputDir("D:/转码输出");
@@ -153,7 +153,12 @@ describe("持久化（localStorage）", () => {
     // 真实 zustand persist 的盘上格式是 { state: <partialize 产物>, version } 信封
     // （zustand/esm/middleware.mjs setItem），partialize 的字段门禁看 state 内层。
     const saved = JSON.parse(raw!) as { state: Record<string, unknown>; version: number };
-    expect(Object.keys(saved.state).sort()).toEqual(["customPresets", "defaultOutputDir", "favorites"]);
+    expect(Object.keys(saved.state).sort()).toEqual([
+      "customPresets",
+      "defaultOutputDir",
+      "engine",
+      "favorites",
+    ]);
     expect(saved.version).toBe(1);
     expect(saved.state.favorites).toEqual(["builtin:mp3-320k"]);
     expect(saved.state.defaultOutputDir).toBe("D:/转码输出");

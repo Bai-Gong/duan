@@ -8,6 +8,8 @@ use crate::ffmpeg::{ffmpeg_info, stderr_tail};
 
 /// ffprobe 探测结果（camelCase 序列化，对齐前端队列字段名）。
 /// videoCodec/audioCodec/container 供队列表直接展示；无对应流时 codec 为空串。
+/// sampleRate/channels（M3 补齐增补）取第一条音频流，供 ye 引擎的音频
+/// 重编码翻译层校验（预设改采样率/多声道时提前拒绝）；无音轨时为 0。
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProbeResult {
@@ -20,6 +22,8 @@ pub struct ProbeResult {
     pub video_codec: String,
     pub audio_codec: String,
     pub container: String,
+    pub sample_rate: u32,
+    pub channels: u32,
 }
 
 /// 探测一个媒体文件，失败时把原因带回前端。
@@ -93,7 +97,9 @@ fn parse_probe_json(v: &Value, path: &str) -> Result<ProbeResult, String> {
     let mut fps = 0.0;
     let mut video_codec = String::new();
     let mut audio_codec = String::new();
-    // 画幅/帧率/视频编码取第一条视频流；音频编码取第一条音频流
+    let mut sample_rate = 0u32;
+    let mut channels = 0u32;
+    // 画幅/帧率/视频编码取第一条视频流；音频编码/采样率/声道取第一条音频流
     for s in &streams {
         // 内嵌封面不算内容视频流：带封面的 mp3/m4a/flac 实测会多出一条
         // codec_type=video 的 mjpeg 流（disposition.attached_pic=1），不剔除会被
@@ -114,12 +120,13 @@ fn parse_probe_json(v: &Value, path: &str) -> Result<ProbeResult, String> {
                     .unwrap_or(0.0);
             }
             Some("video") => {}
-            Some("audio") => {
+            Some("audio") if !has_audio => {
                 has_audio = true;
-                if audio_codec.is_empty() {
-                    audio_codec = s["codec_name"].as_str().unwrap_or("").to_string();
-                }
+                audio_codec = s["codec_name"].as_str().unwrap_or("").to_string();
+                sample_rate = s["sample_rate"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32;
+                channels = s["channels"].as_u64().unwrap_or(0).min(u32::MAX as u64) as u32;
             }
+            Some("audio") => {}
             _ => {}
         }
     }
@@ -157,6 +164,8 @@ fn parse_probe_json(v: &Value, path: &str) -> Result<ProbeResult, String> {
         video_codec,
         audio_codec,
         container,
+        sample_rate,
+        channels,
     })
 }
 
@@ -253,7 +262,7 @@ mod tests {
         let v = json!({
             "streams": [
                 {"codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080, "avg_frame_rate": "30000/1001"},
-                {"codec_type": "audio", "codec_name": "aac"}
+                {"codec_type": "audio", "codec_name": "aac", "sample_rate": 44100, "channels": 2}
             ],
             "format": {"duration": "12.345678", "format_name": "mov,mp4,m4a,3gp,3g2,mj2"}
         });
@@ -266,6 +275,8 @@ mod tests {
         assert!(r.has_audio);
         assert_eq!(r.video_codec, "h264");
         assert_eq!(r.audio_codec, "aac");
+        assert_eq!(r.sample_rate, 44100);
+        assert_eq!(r.channels, 2);
         assert_eq!(r.container, "mp4"); // 逗号链里取与扩展名匹配的段
     }
 
@@ -292,7 +303,7 @@ mod tests {
     fn 解析纯音频_json_容器无时长退回流时长() {
         let v = json!({
             "streams": [
-                {"codec_type": "audio", "codec_name": "mp3", "duration": "3.5"}
+                {"codec_type": "audio", "codec_name": "mp3", "duration": "3.5", "sample_rate": 48000, "channels": 1}
             ],
             "format": {"duration": "N/A", "format_name": "mp3"}
         });
@@ -303,6 +314,8 @@ mod tests {
         assert_eq!(r.width, 0);
         assert_eq!(r.video_codec, ""); // 无视频流
         assert_eq!(r.audio_codec, "mp3");
+        assert_eq!(r.sample_rate, 48000);
+        assert_eq!(r.channels, 1);
         assert_eq!(r.container, "mp3");
     }
 

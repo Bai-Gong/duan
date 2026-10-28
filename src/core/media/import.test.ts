@@ -35,6 +35,8 @@ function makeInfo(over: Partial<MediaInfo> = {}): MediaInfo {
     videoCodec: "h264",
     audioCodec: "aac",
     container: "mov,mp4,m4a,3gp,3g2,mj2",
+    sampleRate: 48000,
+    channels: 2,
     ...over,
   };
 }

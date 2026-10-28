@@ -154,7 +154,7 @@ async function runOne(item: QueueItem, options: StartQueueOptions): Promise<void
     const merged = current.override ? { ...preset, ...current.override } : preset;
     if (engine === "ye") {
       // ye 引擎：preset+源素材 → run_transcode_ye 参数面（能力面外翻译层明确拒绝）。
-      // 队列项 mediaInfo（core/media/probe）含 width/videoCodec，是翻译层所需全集。
+      // 队列项 mediaInfo（core/media/probe）含尺寸/编码/采样率/声道全集。
       const built = buildYeTranscodeParams(merged, current.mediaInfo);
       if (!built.ok) {
         store.setResult(current.id, { status: "failed", error: built.error });
@@ -167,6 +167,10 @@ async function runOne(item: QueueItem, options: StartQueueOptions): Promise<void
         width: built.width,
         height: built.height,
         crf: built.crf,
+        videoBitrateKbps: built.videoBitrateKbps,
+        audioBitrateKbps: built.audioBitrateKbps,
+        stripVideo: built.stripVideo,
+        stripAudio: built.stripAudio,
         totalUs: Math.max(0, Math.round(current.mediaInfo.durationUs)),
       });
     } else {

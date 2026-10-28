@@ -28,6 +28,10 @@ export interface MediaInfo {
   audioCodec: string;
   /** 容器格式名（ffprobe format_name 原样，如 "mov,mp4,m4a,3gp,3g2,mj2"）。 */
   container: string;
+  /** 第一条音频流采样率 Hz（M3 补齐：ye 引擎翻译层校验用）；无音轨为 0。 */
+  sampleRate: number;
+  /** 第一条音频流声道数；无音轨为 0。 */
+  channels: number;
 }
 
 /** ffmpeg 定位结果（ffmpeg_info 命令）。source ∈ {"env","sidecar","path"}。 */
