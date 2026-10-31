@@ -123,11 +123,6 @@ pub fn prepare(input: &Path, preset: &PresetArg) -> Result<(YeSpec, ConvertOptio
         .find(|s| s.media_type == MediaType::Audio);
     let wants_video = preset.video.is_some();
     let wants_audio = preset.audio.is_some() && audio.is_some();
-    issues.extend(
-        ye::media::validate_decoding(&header, &codecs, wants_video, wants_audio)
-            .into_iter()
-            .map(|i| i.reason),
-    );
     if !wants_video && audio.is_none() {
         issues.push("纯音频预设要求源素材带音轨".into());
     }
@@ -185,10 +180,21 @@ pub fn prepare(input: &Path, preset: &PresetArg) -> Result<(YeSpec, ConvertOptio
     let mut audio_output = None;
     let audio_mode = if let Some(a) = preset.audio.as_ref().filter(|_| wants_audio) {
         if let Some(params) = audio.and_then(|s| s.codec.audio.as_ref()) {
-            if ![44100, 48000].contains(&params.sample_rate) {
-                issues.push("源音频须为44.1/48kHz".into());
-            }
             let channels = params.channel_layout.map_or(0, |l| l.channels());
+            for stream in header
+                .streams
+                .iter()
+                .filter(|s| s.media_type == MediaType::Audio)
+            {
+                if let Some(params) = &stream.codec.audio {
+                    if ![44100, 48000].contains(&params.sample_rate) {
+                        issues.push(format!("音轨 {} 须为44.1/48kHz", stream.index));
+                    }
+                    if params.channel_layout.map_or(0, |l| l.channels()) != channels {
+                        issues.push("多音轨声道布局不同，当前预设暂不能保持各轨布局".into());
+                    }
+                }
+            }
             if !(1..=2).contains(&channels) {
                 issues.push("源音频须为单/双声道".into());
             }

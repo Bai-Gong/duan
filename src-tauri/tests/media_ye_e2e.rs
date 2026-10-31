@@ -87,3 +87,73 @@ fn high_aac_pns_probe_thumbnail_and_existing_output_protection() {
     }
     std::fs::remove_dir(dir).unwrap();
 }
+
+#[test]
+fn preset_keeps_all_compatible_audio_tracks() {
+    use duan_lib::preset_ye::{PresetArg, prepare, transcode_preset};
+    let root = std::env::temp_dir().join(format!("duan-multiaudio-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let input = root.join("multi.mp4");
+    let output = root.join("converted.mp4");
+    let made = Command::new("ffmpeg")
+        .args([
+            "-v",
+            "error",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=32x32:rate=12:duration=0.25",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=sample_rate=48000:duration=0.25",
+            "-map",
+            "0:v",
+            "-map",
+            "1:a",
+            "-map",
+            "1:a",
+            "-map",
+            "1:a",
+            "-map",
+            "1:a",
+            "-map",
+            "1:a",
+            "-c:v",
+            "libx264",
+            "-c:a",
+            "aac",
+        ])
+        .arg(&input)
+        .output()
+        .unwrap();
+    assert!(
+        made.status.success(),
+        "{}",
+        String::from_utf8_lossy(&made.stderr)
+    );
+    let preset:PresetArg=serde_json::from_value(serde_json::json!({"container":"mp4","video":{"codec":"libx264","rate":{"mode":"crf","crf":23},"maxHeight":"source","fps":12},"audio":{"codec":"aac","bitrateKbps":128,"sampleRate":48000}})).unwrap();
+    assert!(prepare(&input, &preset).is_ok());
+    let stats = transcode_preset(
+        &input,
+        &output,
+        &preset,
+        &AtomicBool::new(false),
+        &|_, _| {},
+    )
+    .unwrap();
+    assert_eq!(stats.streams, 6);
+    let header = ye::media::inspect(Box::new(std::fs::File::open(&output).unwrap())).unwrap();
+    assert_eq!(
+        header
+            .streams
+            .iter()
+            .filter(|s| s.media_type == ye::codec::MediaType::Audio)
+            .count(),
+        5
+    );
+    std::fs::remove_file(input).unwrap();
+    std::fs::remove_file(output).unwrap();
+    std::fs::remove_dir(root).unwrap();
+}
