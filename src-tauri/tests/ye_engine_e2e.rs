@@ -258,7 +258,7 @@ fn ye_引擎_纯音频重编码与视频码率模式() {
             "-v",
             "error",
             "-show_entries",
-            "stream=codec_type,codec_name",
+            "stream=codec_type,codec_name:stream_side_data=",
             "-of",
             "csv=p=0",
             audio_out.to_str().unwrap(),

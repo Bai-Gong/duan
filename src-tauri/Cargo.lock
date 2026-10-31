@@ -4853,6 +4853,7 @@ dependencies = [
 [[package]]
 name = "ye"
 version = "0.1.0"
+source = "git+https://github.com/Bai-Gong/ye.git?rev=a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4#a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4"
 dependencies = [
  "ye-codec",
  "ye-codec-aac",
@@ -4868,6 +4869,7 @@ dependencies = [
 [[package]]
 name = "ye-codec"
 version = "0.1.0"
+source = "git+https://github.com/Bai-Gong/ye.git?rev=a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4#a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4"
 dependencies = [
  "ye-pixfmt",
  "ye-time",
@@ -4876,6 +4878,7 @@ dependencies = [
 [[package]]
 name = "ye-codec-aac"
 version = "0.1.0"
+source = "git+https://github.com/Bai-Gong/ye.git?rev=a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4#a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4"
 dependencies = [
  "ye-codec",
  "ye-pixfmt",
@@ -4885,6 +4888,7 @@ dependencies = [
 [[package]]
 name = "ye-codec-h264"
 version = "0.1.0"
+source = "git+https://github.com/Bai-Gong/ye.git?rev=a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4#a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4"
 dependencies = [
  "ye-codec",
  "ye-pixfmt",
@@ -4894,6 +4898,7 @@ dependencies = [
 [[package]]
 name = "ye-container"
 version = "0.1.0"
+source = "git+https://github.com/Bai-Gong/ye.git?rev=a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4#a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4"
 dependencies = [
  "ye-codec",
  "ye-time",
@@ -4902,6 +4907,7 @@ dependencies = [
 [[package]]
 name = "ye-container-mp4"
 version = "0.1.0"
+source = "git+https://github.com/Bai-Gong/ye.git?rev=a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4#a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4"
 dependencies = [
  "ye-codec",
  "ye-container",
@@ -4912,10 +4918,12 @@ dependencies = [
 [[package]]
 name = "ye-device"
 version = "0.1.0"
+source = "git+https://github.com/Bai-Gong/ye.git?rev=a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4#a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4"
 
 [[package]]
 name = "ye-filter"
 version = "0.1.0"
+source = "git+https://github.com/Bai-Gong/ye.git?rev=a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4#a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4"
 dependencies = [
  "ye-codec",
  "ye-time",
@@ -4924,10 +4932,12 @@ dependencies = [
 [[package]]
 name = "ye-pixfmt"
 version = "0.1.0"
+source = "git+https://github.com/Bai-Gong/ye.git?rev=a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4#a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4"
 
 [[package]]
 name = "ye-time"
 version = "0.1.0"
+source = "git+https://github.com/Bai-Gong/ye.git?rev=a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4#a83ae7f52a0703ab05675d4a3b5f2291cf72b7f4"
 
 [[package]]
 name = "yoke"
