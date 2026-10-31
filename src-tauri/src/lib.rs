@@ -7,7 +7,9 @@
 // 无此需求，保持私有）。
 mod ffmpeg;
 pub mod media_ye;
+pub mod preset_ye;
 mod probe;
+pub mod runtime;
 pub mod ye_engine;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -18,9 +20,12 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
+            runtime::media_runtime_info,
             probe::probe_media,
             media_ye::probe_media_ye,
             media_ye::extract_frame_ye,
+            preset_ye::check_preset_ye,
+            preset_ye::run_preset_ye,
             ffmpeg::ffmpeg_info,
             ffmpeg::extract_frame,
             ffmpeg::run_transcode,

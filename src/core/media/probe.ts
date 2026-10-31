@@ -43,7 +43,7 @@ export interface FfmpegInfo {
 
 /** 探测单个媒体文件；失败（无法识别/文件损坏）由 Rust 侧返回 Err，此处原样抛出。 */
 export function probeMedia(path: string): Promise<MediaInfo> {
-  return invoke<MediaInfo>("probe_media", { path });
+  return invoke<MediaInfo>("probe_media_ye", { path });
 }
 
 /**

@@ -16,7 +16,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { buildTranscodeArgs } from "../preset/buildTranscodeArgs";
-import { buildYeTranscodeParams } from "../preset/buildYeTranscodeParams";
 import type { Preset } from "../preset/types";
 import { useQueueStore } from "./store";
 import type { QueueItem } from "./types";
@@ -37,7 +36,7 @@ export type TranscodeEngine = "ffmpeg" | "ye";
 export interface StartQueueOptions {
   /** presetId→Preset 解析（内置+自建全集查找）；由接线层（TopBar/导入编排）注入。 */
   resolvePreset(id: string): Preset | undefined;
-  /** 当前引擎选择（接线层注入，避免队列引擎反向依赖预设 store）；缺省 ffmpeg。 */
+  /** 当前引擎选择（接线层注入，避免队列引擎反向依赖预设 store）；缺省 ye。 */
   getEngine?(): TranscodeEngine;
 }
 
@@ -50,6 +49,7 @@ let stopRequested = false;
 const cancelFlags = new Set<string>();
 /** 当前 running 项走的引擎：cancelJob 据此路由到对应取消命令（两引擎句柄表独立）。 */
 let activeEngine: TranscodeEngine | null = null;
+let activeStarted = false;
 // —— 进度节流缓冲（单 worker，同一时刻至多一个合法 jobId 的事件流） ——
 let lastFlushAt = 0;
 let buffered: { jobId: string; timeUs: number } | null = null;
@@ -61,6 +61,7 @@ export function resetRunnerState(): void {
   stopRequested = false;
   cancelFlags.clear();
   activeEngine = null;
+  activeStarted = false;
   lastFlushAt = 0;
   buffered = null;
   if (flushTimer !== null) {
@@ -80,10 +81,11 @@ export async function startQueue(options: StartQueueOptions): Promise<void> {
   stopRequested = false;
   useQueueStore.getState().setRunning(true);
 
-  const unlisten = await listen<TranscodeProgressEvent>("transcode-progress", (event) => {
-    onProgress(event.payload);
-  });
+  let unlisten: (() => void) | undefined;
   try {
+    unlisten = await listen<TranscodeProgressEvent>("transcode-progress", (event) => {
+      onProgress(event.payload);
+    });
     while (!stopRequested) {
       const next = useQueueStore.getState().items.find((i) => i.status === "waiting");
       if (!next) break; // 空队停转
@@ -93,7 +95,7 @@ export async function startQueue(options: StartQueueOptions): Promise<void> {
     loopActive = false;
     stopRequested = false;
     flushBuffered(); // 尾帧进度补写（若缓冲期间项已终态，flush 内部防御会拒写）
-    unlisten();
+    unlisten?.();
     useQueueStore.getState().setRunning(false);
   }
 }
@@ -126,6 +128,7 @@ export function cancelJob(jobId: string): void {
   }
   if (item.status !== "running") return;
   cancelFlags.add(jobId);
+  if (!activeStarted) return;
   const command = activeEngine === "ye" ? "cancel_transcode_ye" : "cancel_transcode";
   void invoke<null>(command, { jobId }).catch(() => {
     // 取消未送达（转码多半已自行结束）：撤标记，让自然结果说了算，
@@ -143,7 +146,7 @@ async function runOne(item: QueueItem, options: StartQueueOptions): Promise<void
   const current = useQueueStore.getState().items.find((i) => i.id === item.id);
   if (!current) return;
 
-  const engine: TranscodeEngine = options.getEngine?.() ?? "ffmpeg";
+  const engine: TranscodeEngine = options.getEngine?.() ?? "ye";
   activeEngine = engine;
   try {
     const preset = options.resolvePreset(current.presetId);
@@ -153,25 +156,22 @@ async function runOne(item: QueueItem, options: StartQueueOptions): Promise<void
     }
     const merged = current.override ? { ...preset, ...current.override } : preset;
     if (engine === "ye") {
-      // ye 引擎：preset+源素材 → run_transcode_ye 参数面（能力面外翻译层明确拒绝）。
-      // 队列项 mediaInfo（core/media/probe）含尺寸/编码/采样率/声道全集。
-      const built = buildYeTranscodeParams(merged, current.mediaInfo);
-      if (!built.ok) {
-        store.setResult(current.id, { status: "failed", error: built.error });
+      // Rust 根据实际源轨道检查预设，前端只呈现原因。
+      const issues = await invoke<string[]>("check_preset_ye", { preset: merged,inputPath:current.path });
+      if (cancelFlags.delete(current.id)) {
+        store.setResult(current.id, { status: "canceled" });
         return;
       }
-      await invoke<null>("run_transcode_ye", {
+      if (issues.length) {
+        store.setResult(current.id, { status: "failed", error: `任务受阻：${issues.join("；")}` });
+        return;
+      }
+      activeStarted = true;
+      await invoke<null>("run_preset_ye", {
         jobId: current.id,
         inputPath: current.path,
         outPath: current.outPath,
-        width: built.width,
-        height: built.height,
-        crf: built.crf,
-        videoBitrateKbps: built.videoBitrateKbps,
-        audioBitrateKbps: built.audioBitrateKbps,
-        stripVideo: built.stripVideo,
-        stripAudio: built.stripAudio,
-        totalUs: Math.max(0, Math.round(current.mediaInfo.durationUs)),
+        preset: merged,
       });
     } else {
       // buildTranscodeArgs 消费 preset/types 的 MediaInfo 子集（含 path、不含 duration 等），
@@ -182,6 +182,7 @@ async function runOne(item: QueueItem, options: StartQueueOptions): Promise<void
         store.setResult(current.id, { status: "failed", error: built.error });
         return;
       }
+      activeStarted = true;
       await invoke<null>("run_transcode", {
         jobId: current.id,
         args: built.args,
@@ -203,6 +204,7 @@ async function runOne(item: QueueItem, options: StartQueueOptions): Promise<void
     }
   } finally {
     activeEngine = null;
+    activeStarted = false;
   }
 }
 

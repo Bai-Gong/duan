@@ -33,7 +33,10 @@ fn tool(name: &str) -> PathBuf {
 }
 
 fn run(cmd: &Path, args: &[&str]) -> (bool, Vec<u8>, Vec<u8>) {
-    let out = Command::new(cmd).args(args).output().expect("启动外部命令失败");
+    let out = Command::new(cmd)
+        .args(args)
+        .output()
+        .expect("启动外部命令失败");
     (out.status.success(), out.stdout, out.stderr)
 }
 
@@ -135,7 +138,10 @@ fn ye_引擎_转码对拍_ffmpeg() {
     let ffprobe = tool("ffprobe");
     // 工具缺席＝环境不具备，明确失败（不跳过——对拍不许假绿）。
     let (ok, _, _) = run(&ffmpeg, &["-version"]);
-    assert!(ok, "ffmpeg 不可用（{ffmpeg:?}）：对拍测试需要 binaries/ 下的 ffmpeg/ffprobe");
+    assert!(
+        ok,
+        "ffmpeg 不可用（{ffmpeg:?}）：对拍测试需要 binaries/ 下的 ffmpeg/ffprobe"
+    );
     let (ok, _, _) = run(&ffprobe, &["-version"]);
     assert!(ok, "ffprobe 不可用（{ffprobe:?}）");
 
@@ -179,15 +185,32 @@ fn ye_引擎_转码对拍_ffmpeg() {
             ff_out.to_str().unwrap(),
         ],
     );
-    assert!(ok, "ffmpeg 对照转码失败: {}", String::from_utf8_lossy(&stderr));
+    assert!(
+        ok,
+        "ffmpeg 对照转码失败: {}",
+        String::from_utf8_lossy(&stderr)
+    );
 
     // —— 对拍 1：双方产物 ffmpeg 无错解码 ——
     for file in [&ye_out, &ff_out] {
         let (ok, _, err) = run(
             &ffmpeg,
-            &["-v", "error", "-i", file.to_str().unwrap(), "-f", "null", "-"],
+            &[
+                "-v",
+                "error",
+                "-i",
+                file.to_str().unwrap(),
+                "-f",
+                "null",
+                "-",
+            ],
         );
-        assert!(ok, "{} 解码报错: {}", file.display(), String::from_utf8_lossy(&err));
+        assert!(
+            ok,
+            "{} 解码报错: {}",
+            file.display(),
+            String::from_utf8_lossy(&err)
+        );
     }
 
     // —— 对拍 2：时长差 ≤ 0.1s 且帧数一致 ——
@@ -197,7 +220,10 @@ fn ye_引擎_转码对拍_ffmpeg() {
         (ye_dur - ff_dur).abs() <= 0.1,
         "时长差超限：ye {ye_dur}s vs ffmpeg {ff_dur}s"
     );
-    assert_eq!(ye_frames, ff_frames, "帧数不一致（ye {ye_frames} vs ffmpeg {ff_frames}）");
+    assert_eq!(
+        ye_frames, ff_frames,
+        "帧数不一致（ye {ye_frames} vs ffmpeg {ff_frames}）"
+    );
 
     // —— 对拍 3：同点位（1.0s）灰度帧平均 |Δ| ≤ 6 ——
     let ye_frame = extract_gray_frame(&ffmpeg, &ye_out, "1.0");
@@ -226,7 +252,10 @@ fn ye_引擎_纯音频重编码与视频码率模式() {
     let ffmpeg = tool("ffmpeg");
     let ffprobe = tool("ffprobe");
     let (ok, _, _) = run(&ffmpeg, &["-version"]);
-    assert!(ok, "ffmpeg 不可用（{ffmpeg:?}）：对拍测试需要 binaries/ 下的 ffmpeg/ffprobe");
+    assert!(
+        ok,
+        "ffmpeg 不可用（{ffmpeg:?}）：对拍测试需要 binaries/ 下的 ffmpeg/ffprobe"
+    );
     let (ok, _, _) = run(&ffprobe, &["-version"]);
     assert!(ok, "ffprobe 不可用（{ffprobe:?}）");
 
@@ -246,8 +275,7 @@ fn ye_引擎_纯音频重编码与视频码率模式() {
             bitrate_bps: 128_000,
         },
     };
-    let stats = ye_convert(&src, &audio_out, &spec, &cancel, &|_, _| {})
-        .expect("纯音频转码失败");
+    let stats = ye_convert(&src, &audio_out, &spec, &cancel, &|_, _| {}).expect("纯音频转码失败");
     assert_eq!(stats.video_frames, 0, "剥视频后不应有视频帧");
     assert!(stats.audio_frames > 0, "应有音频输出包");
 
@@ -284,7 +312,11 @@ fn ye_引擎_纯音频重编码与视频码率模式() {
             "-",
         ],
     );
-    assert!(ok && err.is_empty(), "音频产物解码报错: {}", String::from_utf8_lossy(&err));
+    assert!(
+        ok && err.is_empty(),
+        "音频产物解码报错: {}",
+        String::from_utf8_lossy(&err)
+    );
     let detect = String::from_utf8_lossy(&err);
     // -v error 下 volumedetect 的摘要仍走 stderr（info 级被静音则退回
     // 仅校验解码干净；开发机实测摘要可见）。
@@ -314,14 +346,21 @@ fn ye_引擎_纯音频重编码与视频码率模式() {
         strip_video: false,
         audio: AudioEncodeSettings::Drop,
     };
-    let stats = ye_convert(&src, &vb_out, &spec, &cancel, &|_, _| {})
-        .expect("码率模式转码失败");
+    let stats = ye_convert(&src, &vb_out, &spec, &cancel, &|_, _| {}).expect("码率模式转码失败");
     assert!(stats.video_frames > 0, "应有视频帧输出");
     assert_eq!(stats.audio_frames, 0, "剥音轨后不应有音频包");
 
     let (ok, _, err) = run(
         &ffmpeg,
-        &["-v", "error", "-i", vb_out.to_str().unwrap(), "-f", "null", "-"],
+        &[
+            "-v",
+            "error",
+            "-i",
+            vb_out.to_str().unwrap(),
+            "-f",
+            "null",
+            "-",
+        ],
     );
     assert!(
         ok && err.is_empty(),

@@ -56,7 +56,11 @@ pub fn probe_media(path: String) -> Result<ProbeResult, String> {
 ///    流判定放在前则图片永远走不到，必须扩展名优先）；
 /// ② 有视频流 → video（gif 走此支，取真实 fps）；
 /// ③ 有音频流 → audio；④ 否则报错。
-fn classify_media_kind(ext: &str, has_video: bool, has_audio: bool) -> Result<&'static str, String> {
+fn classify_media_kind(
+    ext: &str,
+    has_video: bool,
+    has_audio: bool,
+) -> Result<&'static str, String> {
     match ext.to_ascii_lowercase().as_str() {
         "png" | "jpg" | "jpeg" | "webp" | "bmp" => Ok("image"),
         _ if has_video => Ok("video"),
@@ -147,7 +151,11 @@ fn parse_probe_json(v: &Value, path: &str) -> Result<ProbeResult, String> {
         .unwrap_or_else(|| stream_max_duration_us(&streams));
 
     // 图片是零时长素材：durationUs=0、fps=0
-    let (duration_us, fps) = if kind == "image" { (0, 0.0) } else { (duration_us, fps) };
+    let (duration_us, fps) = if kind == "image" {
+        (0, 0.0)
+    } else {
+        (duration_us, fps)
+    };
 
     let container = v["format"]["format_name"]
         .as_str()

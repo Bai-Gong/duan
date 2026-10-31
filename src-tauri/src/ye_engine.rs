@@ -1,20 +1,6 @@
-//! ye 进程内转码引擎（M3 接线轨 + M3 补齐）：门面 [`ye::convert::convert`]
-//! 的命令封装。
-//!
-//! 与 ffmpeg.rs 的子进程路径构成「引擎二选一」（对拍期 ffmpeg 留作 oracle 与
-//! 回退，见上级 AGENTS.md 接入方式）：同一条 transcode-progress 事件契约
-//! （`{jobId, timeUs, totalUs}`，前端 runner 按 jobId 路由），取消从
-//! 「kill 子进程」换成「AtomicBool 置位」（ye 泵每输出包检查点检出即返回
-//! `Cancelled`）。
-//!
-//! 命令层只做参数校验/事件桥/取消表；转码主体在 [`ye_convert`]（纯库调用，
-//! 不碰 Tauri 类型）——`tests/ye_engine_e2e.rs` 的对拍测试直接调它。
-//!
-//! 能力面（ye M3 补齐后）：输入 MP4 系的 H.264（视频轨）+ AAC（音频轨），
-//! 视频重编码 H.264 Baseline（CRF 质量模式，或目标码率的 A-VBR 封顶——
-//! 真码控），音频 AAC-LC 重编码（目标码率）或直通，支持剥视频（纯音频
-//! 输出）/剥音轨，输出 MP4。改帧率/非 H.264 视频源/非 AAC 音频源/改采样率
-//! 由前端翻译层（buildYeTranscodeParams）提前拒绝，这里只兜参数形状。
+//! 进程内冶转码与取消桥；正式预设由 preset_ye 在 Rust 校验和翻译。
+//! 目标有理数帧率、音频重采样走 convert_with_options；原有命令兼容保留。
+//! 输出使用同目录独占临时文件，成功后提交，失败/取消清理自身半成品。
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -29,7 +15,7 @@ use crate::ffmpeg::TranscodeProgress;
 
 /// 取消标记表：jobId → 运行中转码的取消旗标（与 ffmpeg.rs 的 KILL 表同构，
 /// 只是「句柄」从子进程换成布尔）。run_transcode_ye 登记本地 Arc、收尾摘除。
-static CANCEL_FLAGS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
+pub(crate) static CANCEL_FLAGS: LazyLock<Mutex<HashMap<String, Arc<AtomicBool>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// 码率上限（kbps）：命令入参的形状校验用（4 Gbps——远超现实转码需求，
@@ -51,6 +37,20 @@ pub struct YeSpec {
     pub strip_video: bool,
     /// 音频三态：直通 / AAC-LC 重编码（目标码率）/ 剥轨（对标 `-an`）。
     pub audio: ye::convert::AudioEncodeSettings,
+}
+
+impl YeSpec {
+    pub fn video_settings(&self) -> Option<ye::convert::VideoEncodeSettings> {
+        (!self.strip_video).then_some(ye::convert::VideoEncodeSettings {
+            chain: ye::convert::VideoChain {
+                format: None,
+                size: self.size,
+            },
+            gop: 250,
+            quality: ye::codec::QualityMode::Crf(self.crf),
+            bit_rate: self.video_bitrate_bps,
+        })
+    }
 }
 
 /// 命令入参校验：尺寸（两轴同给或同缺）、CRF 值域、码率值域与剥轨互斥。
@@ -135,7 +135,14 @@ pub fn ye_convert(
     progress: &dyn Fn(i64, i64),
 ) -> Result<ye::convert::ConvertStats, String> {
     let ctx = || format!("{} → {}", input.display(), output.display());
-    let result = run_ye_convert(input, output, spec, cancel, progress);
+    let result = run_ye_convert(
+        input,
+        output,
+        spec,
+        &ye::convert::ConvertOptions::default(),
+        cancel,
+        progress,
+    );
 
     result.map_err(|e| format!("{}: {e}", ctx()))
 }
@@ -144,6 +151,7 @@ fn run_ye_convert(
     input: &Path,
     output: &Path,
     spec: &YeSpec,
+    options: &ye::convert::ConvertOptions,
     cancel: &AtomicBool,
     progress: &dyn Fn(i64, i64),
 ) -> Result<ye::convert::ConvertStats, String> {
@@ -162,28 +170,16 @@ fn run_ye_convert(
     ye::codec_aac::register_aac(&mut codecs);
     ye::codec_aac::register_aac_encoder(&mut codecs);
 
-    let settings = ye::convert::VideoEncodeSettings {
-        chain: ye::convert::VideoChain {
-            format: None,
-            size: spec.size,
-        },
-        gop: 250,
-        quality: ye::codec::QualityMode::Crf(spec.crf),
-        bit_rate: spec.video_bitrate_bps,
-    };
-    let video = if spec.strip_video {
-        None
-    } else {
-        Some(&settings)
-    };
-    let stats = ye::convert::convert(
+    let settings = spec.video_settings();
+    let stats = ye::convert::convert_with_options(
         &containers,
         &codecs,
         Box::new(BufReader::new(in_file)),
         "mp4",
         Box::new(out_file),
-        video,
+        settings.as_ref(),
         &spec.audio,
+        options,
         ye::convert::filter_ops(),
         progress,
         cancel,
@@ -191,6 +187,17 @@ fn run_ye_convert(
     .map_err(|e| e.to_string())?;
     transaction.commit().map_err(|e| e.to_string())?;
     Ok(stats)
+}
+
+pub fn ye_convert_with_options(
+    input: &Path,
+    output: &Path,
+    spec: &YeSpec,
+    options: &ye::convert::ConvertOptions,
+    cancel: &AtomicBool,
+    progress: &dyn Fn(i64, i64),
+) -> Result<ye::convert::ConvertStats, String> {
+    run_ye_convert(input, output, spec, options, cancel, progress)
 }
 
 /// 跑转码（ye 引擎）：与 ffmpeg.rs 的 run_transcode 同一事件契约与取消语义。

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { loadRuntime } from "../core/media/runtime";
 import { DockHost, ThemeProvider } from "@baigong/fang";
 import "@baigong/fang/tokens.css";
 import { TopBar } from "./TopBar";
@@ -18,6 +19,7 @@ import { FALLBACK_PRESET } from "../features/queue-table/QueueTablePanel";
  * 保证首次导入即有可用预设。
  */
 export function AppShell() {
+  useEffect(()=>{void loadRuntime();},[]);
   const [currentPresetId, setCurrentPresetId] = useState<string>(FALLBACK_PRESET.id);
   const [previewItemId, setPreviewItemId] = useState<string | null>(null);
 

@@ -17,7 +17,7 @@ export function getFrameUrl(path: string, timeUs = 0): Promise<string> {
   const hit = cache.get(key);
   if (hit) return hit;
   // extract_frame 返回临时 png 的绝对路径，转成 <img> 可用的 asset URL
-  const job = invoke<string>("extract_frame", { path, timeUs }).then(assetUrl);
+  const job = invoke<string>("extract_frame_ye", { path, timeUs }).then(assetUrl);
   cache.set(key, job);
   job.catch(() => cache.delete(key)); // 失败不占缓存位
   return job;

@@ -1,8 +1,6 @@
 # 百工·锻发布 —— main 分支：门禁复跑 + Windows 正式安装包 + GitHub Release。
 # Release 以 tauri.conf.json 的版本号打 tag（v{version}）；
 # 每次正式发布前请先在 main 上提升版本号，未提升时将更新同名 Release。
-# tauri.conf.json 已映射 bundle.resources binaries/*（ffmpeg sidecar 进安装包），
-# runner 无本机 ffmpeg，打包前必须先跑 fetch-ffmpeg 落位两 exe（幂等），否则 resources glob 空匹配。
 
 name: 发布流水线 (main)
 
@@ -25,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Bai-Gong/fang
-          ref: main
+          ref: 21c522dba3c1444060c5cd6ebd4e6760d21f9b38
           path: fang
       # checkout 只允许工作区内路径，检出到 fang/ 后挪到兄弟目录 ../fang
       - name: fang 挪到兄弟目录
@@ -53,7 +51,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Bai-Gong/ye
-          ref: ba712826be9e489d439dd6c2276055d94d67c66c
+          ref: e30724896b8bc8e645b86d1585bb51acdcfef6c1
           path: ye
       - name: ye 挪到兄弟目录
         run: mv ye ../ye
@@ -62,7 +60,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev \
-            libxdo-dev libayatana-appindicator3-dev libssl-dev pkg-config
+            libxdo-dev libayatana-appindicator3-dev libssl-dev pkg-config ffmpeg
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
@@ -81,7 +79,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Bai-Gong/fang
-          ref: main
+          ref: 21c522dba3c1444060c5cd6ebd4e6760d21f9b38
           path: fang
       # checkout 只允许工作区内路径，检出到 fang/ 后挪到兄弟目录 ../fang
       - name: fang 挪到兄弟目录
@@ -91,7 +89,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: Bai-Gong/ye
-          ref: ba712826be9e489d439dd6c2276055d94d67c66c
+          ref: e30724896b8bc8e645b86d1585bb51acdcfef6c1
           path: ye
       - name: ye 挪到兄弟目录
         run: mv ye ../ye
@@ -107,17 +105,12 @@ jobs:
           workspaces: src-tauri
       - name: 安装依赖
         run: npm ci
-      # ffmpeg sidecar 落位（脚本幂等，已存在则跳过）。
       # 透传 Actions 自带 token：GitHub API 匿名 60 次/时/IP 在共享出口 IP 的托管 runner 上
       # 极易撞限（本机已实测 403 耗尽）；自带 token 额度 1000 次/时/仓库，单次打包仅需
       # 1 次 release 查询。下载本体走 browser_download_url 不占 API 限流。
-      - name: 下载 ffmpeg sidecar
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/fetch-ffmpeg.mjs
       # 只产 NSIS 安装包：WiX(MSI) 的 codepage 1252 无法编码中文产品名（zhi 仓库实测 LGHT0311）
       - name: 构建 Tauri 安装包
-        run: npm run tauri build -- --bundles nsis
+        run: npm run package:windows
       - name: 读取版本号
         id: ver
         shell: bash

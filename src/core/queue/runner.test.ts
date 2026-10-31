@@ -98,17 +98,19 @@ function deferred<T>(): Deferred<T> {
 /** run_transcode / run_transcode_ye 结果挂钩（各按 FIFO 供循环取用），测试手动 resolve/reject 模拟转码结束。 */
 const runQueue: Deferred<null>[] = [];
 const runYeQueue: Deferred<null>[] = [];
+const checkQueue: string[][] = [];
 mocks.invokeMock.mockImplementation((cmd: string) => {
   if (cmd === "run_transcode") {
     const d = runQueue.shift();
     if (!d) return Promise.reject(new Error("测试未挂钩 run_transcode"));
     return d.promise;
   }
-  if (cmd === "run_transcode_ye") {
+  if (cmd === "run_preset_ye") {
     const d = runYeQueue.shift();
     if (!d) return Promise.reject(new Error("测试未挂钩 run_transcode_ye"));
     return d.promise;
   }
+  if (cmd === "check_preset_ye") return Promise.resolve(checkQueue.shift() ?? []);
   if (cmd === "cancel_transcode" || cmd === "cancel_transcode_ye") return Promise.resolve(null);
   return Promise.resolve(null);
 });
@@ -158,6 +160,7 @@ beforeEach(() => {
   mocks.progressHandlerRef.current = null;
   runQueue.length = 0;
   runYeQueue.length = 0;
+  checkQueue.length = 0;
 });
 
 describe("startQueue 串行循环", () => {
@@ -165,7 +168,7 @@ describe("startQueue 串行循环", () => {
     const ids = addItems(2);
     const d1 = armRun();
     const d2 = armRun();
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
 
     await vi.waitFor(() => expect(item(ids[0]).status).toBe("running"));
     expect(item(ids[1]).status).toBe("waiting");
@@ -183,7 +186,7 @@ describe("startQueue 串行循环", () => {
   });
 
   it("空队停转：无项时不 invoke，running 立即回落", async () => {
-    await startQueue({ resolvePreset: () => preset });
+    await startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
     expect(mocks.invokeMock).not.toHaveBeenCalled();
     expect(useQueueStore.getState().running).toBe(false);
   });
@@ -191,7 +194,7 @@ describe("startQueue 串行循环", () => {
   it("run_transcode 传参对齐契约：jobId/args/outPath/totalUs", async () => {
     const [id] = addItems(1);
     const d = armRun();
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
     await vi.waitFor(() => expect(item(id).status).toBe("running"));
     d.resolve(null);
     await done;
@@ -207,7 +210,7 @@ describe("startQueue 串行循环", () => {
   it("run_transcode 失败落 failed，error=reject 消息（stderr 尾部）", async () => {
     const [id] = addItems(1);
     const d = armRun();
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
     await vi.waitFor(() => expect(item(id).status).toBe("running"));
     d.reject(new Error("ffmpeg 导出失败（退出码 Some(1)）: …stderr 尾部…"));
     await done;
@@ -218,7 +221,7 @@ describe("startQueue 串行循环", () => {
 
   it("预设查不到落 failed，循环不中断", async () => {
     addItems(1);
-    const done = startQueue({ resolvePreset: () => undefined });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => undefined });
     await done;
     const failed = useQueueStore.getState().items[0];
     expect(failed.status).toBe("failed");
@@ -231,7 +234,7 @@ describe("startQueue 串行循环", () => {
       ok: false as const,
       error: "图片素材不在 MVP 转码范围：C:/media/素材0.mp4",
     }));
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
     await done;
     const failed = useQueueStore.getState().items[0];
     expect(failed.status).toBe("failed");
@@ -244,7 +247,7 @@ describe("取消链路", () => {
   it("取消后 reject 置 canceled 且忽略 stderr（不落 error）", async () => {
     const [id] = addItems(1);
     const d = armRun();
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
     await vi.waitFor(() => expect(item(id).status).toBe("running"));
 
     cancelJob(id);
@@ -260,7 +263,7 @@ describe("取消链路", () => {
   it("取消后仍收到进度事件不写入（入口与节流补写双重防御）", async () => {
     const [id] = addItems(1);
     const d = armRun();
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
     await vi.waitFor(() => expect(item(id).status).toBe("running"));
 
     // 首事件在节流窗口外，立即落库
@@ -289,7 +292,7 @@ describe("取消链路", () => {
   it("stopQueue：当前项取消、剩余 waiting 保留、循环退出", async () => {
     const ids = addItems(2);
     const d1 = armRun();
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
     await vi.waitFor(() => expect(item(ids[0]).status).toBe("running"));
 
     stopQueue();
@@ -308,7 +311,7 @@ describe("进度路由与节流", () => {
   it("按 jobId 路由：非当前项/未知 jobId 的事件拒收", async () => {
     const ids = addItems(2);
     const d = armRun();
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
     await vi.waitFor(() => expect(item(ids[0]).status).toBe("running"));
 
     emitProgress({ jobId: ids[1], timeUs: 5_000_000, totalUs: 10_000_000 }); // waiting 项
@@ -322,7 +325,7 @@ describe("进度路由与节流", () => {
   it("节流：100ms 内多次事件合并为最后一次", async () => {
     const [id] = addItems(1);
     const d = armRun();
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
     await vi.waitFor(() => expect(item(id).status).toBe("running"));
 
     emitProgress({ jobId: id, timeUs: 1_000_000, totalUs: 10_000_000 });
@@ -346,18 +349,11 @@ describe("ye 引擎分支（M3 接线轨）", () => {
     await done;
 
     expect(item(id).status).toBe("done");
-    expect(mocks.invokeMock).toHaveBeenCalledWith("run_transcode_ye", {
+    expect(mocks.invokeMock).toHaveBeenCalledWith("run_preset_ye", {
       jobId: id,
       inputPath: item(id).path,
       outPath: item(id).outPath,
-      width: 640,
-      height: 360,
-      crf: 23,
-      videoBitrateKbps: null,
-      audioBitrateKbps: 256,
-      stripVideo: false,
-      stripAudio: false,
-      totalUs: 10_000_000,
+      preset,
     });
     expect(mocks.buildArgsMock).not.toHaveBeenCalled();
   });
@@ -365,7 +361,7 @@ describe("ye 引擎分支（M3 接线轨）", () => {
   it("缺省 getEngine 走 ffmpeg 路径（不传即 ffmpeg，行为向后兼容）", async () => {
     const [id] = addItems(1);
     const d = armRun();
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
     await vi.waitFor(() => expect(item(id).status).toBe("running"));
     d.resolve(null);
     await done;
@@ -377,16 +373,13 @@ describe("ye 引擎分支（M3 接线轨）", () => {
 
   it("ye 翻译被拒（能力面外）落 failed，不 invoke", async () => {
     addItems(1);
-    mocks.buildYeMock.mockImplementationOnce(() => ({
-      ok: false as const,
-      error: "ye 引擎暂不支持目标码率（真码控后续批次），请把预设切成 CRF 模式或用 ffmpeg 引擎",
-    }));
+    checkQueue.push(["暂不支持此编码器"]);
     const done = startQueue({ resolvePreset: () => preset, getEngine: () => "ye" });
     await done;
     const failed = useQueueStore.getState().items[0];
     expect(failed.status).toBe("failed");
-    expect(failed.error).toContain("目标码率");
-    expect(mocks.invokeMock).not.toHaveBeenCalled();
+    expect(failed.error).toContain("编码器");
+    expect(mocks.invokeMock).toHaveBeenCalledTimes(1);
   });
 
   it("ye 引擎取消路由到 cancel_transcode_ye，reject 置 canceled", async () => {
@@ -411,7 +404,7 @@ describe("skip 门禁", () => {
     const ids = addItems(2);
     useQueueStore.getState().skip(ids[0]); // 队首跳过
     const d = armRun();
-    const done = startQueue({ resolvePreset: () => preset });
+    const done = startQueue({ getEngine: () => "ffmpeg", resolvePreset: () => preset });
 
     await vi.waitFor(() => expect(item(ids[1]).status).toBe("running"));
     expect(item(ids[0]).status).toBe("skipped");
@@ -423,4 +416,39 @@ describe("skip 门禁", () => {
     await done;
     expect(mocks.buildArgsMock).toHaveBeenCalledTimes(1); // 跳过项不生成 args
   });
+});
+
+it("default pure engine settles ten mixed jobs without a fallback",async()=>{
+  const ids=addItems(10);cancelJob(ids[9]);
+  checkQueue.push([], ["能力不足：此预设不可执行"], [], [], [], [], [], [], []);
+  const runs=Array.from({length:8},()=>armRunYe());
+  const done=startQueue({resolvePreset:()=>preset});
+  await vi.waitFor(()=>expect(item(ids[0]).status).toBe("running"));runs[0].resolve(null);
+  await vi.waitFor(()=>expect(item(ids[2]).status).toBe("running"));runs[1].reject(new Error("执行失败：损坏的压缩包"));
+  await vi.waitFor(()=>expect(item(ids[3]).status).toBe("running"));cancelJob(ids[3]);runs[2].reject(new Error("cancelled"));
+  for(const run of runs.slice(3))run.resolve(null);
+  await done;
+  expect(ids.map((id)=>item(id).status)).toEqual(["done","failed","failed","canceled","done","done","done","done","done","canceled"]);
+  expect(item(ids[1]).error).toContain("能力不足");expect(item(ids[2]).error).toContain("损坏");
+  expect(mocks.invokeMock.mock.calls.every(([command])=>command!=="run_transcode")).toBe(true);
+});
+
+it("预检期间取消不会启动转码", async () => {
+  let finish!: (issues: string[]) => void;
+  const check = new Promise<string[]>((resolve) => { finish = resolve; });
+  mocks.invokeMock.mockImplementation((command:string) => command === "check_preset_ye" ? check : Promise.resolve(null));
+  const [id] = addItems(1);
+  const run = startQueue({resolvePreset:()=>preset});
+  await vi.waitFor(()=>expect(mocks.invokeMock).toHaveBeenCalledWith("check_preset_ye",expect.anything()));
+  cancelJob(id);
+  finish([]);
+  await run;
+  expect(item(id).status).toBe("canceled");
+  expect(mocks.invokeMock.mock.calls.some(([command])=>command === "run_preset_ye")).toBe(false);
+});
+it("监听注册失败后队列可以再次启动", async () => {
+  mocks.listenMock.mockRejectedValueOnce(new Error("listener unavailable"));
+  await expect(startQueue({resolvePreset:()=>preset})).rejects.toThrow("listener unavailable");
+  expect(useQueueStore.getState().running).toBe(false);
+  await startQueue({resolvePreset:()=>preset});
 });

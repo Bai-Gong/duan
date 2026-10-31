@@ -5,13 +5,14 @@
  * currentPresetId 是队列会话 UI 态，由 AppShell 持有（core 两个 store 均无此字段），
  * 经 props 下发；树/列表自建不进 fang（fang ui/ 尚无控件，成熟后按 R5 反哺）。
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DockPanel } from "@baigong/fang";
 import { Search, Star } from "lucide-react";
 import { BUILTIN_PRESETS } from "../../core/preset/builtin";
 import { usePresetStore } from "../../core/preset/store";
 import type { AudioCodec, Preset, VideoCodec } from "../../core/preset/types";
 import "./preset-browser.css";
+import { checkPresetYe } from "../../core/preset/checkPresetYe";
 
 /** 编码器名 → 人话标签（仅展示用，不改写预设数据）。 */
 const VIDEO_CODEC_LABEL: Record<VideoCodec, string> = {
@@ -61,6 +62,13 @@ export function PresetBrowserPanel({ currentPresetId, onSelectPreset }: PresetBr
   const favorites = usePresetStore((s) => s.favorites);
   const toggleFavorite = usePresetStore((s) => s.toggleFavorite);
   const [keyword, setKeyword] = useState("");
+  const [availability,setAvailability]=useState<Record<string,string[]>>({});
+  useEffect(()=>{
+    let active=true;
+    void Promise.all([...BUILTIN_PRESETS,...customPresets].map(async(p)=>[p.id,await checkPresetYe(p)] as const))
+      .then((entries)=>{if(active)setAvailability(Object.fromEntries(entries));});
+    return ()=>{active=false;};
+  },[customPresets]);
 
   const sections = useMemo<PresetSection[]>(() => {
     const kw = keyword.trim().toLowerCase();
@@ -138,7 +146,7 @@ export function PresetBrowserPanel({ currentPresetId, onSelectPreset }: PresetBr
                             onClick={() => onSelectPreset(preset.id)}
                             title={`设为当前预设：${preset.name}`}
                           >
-                            <span className="preset-item__name">{preset.name}</span>
+                            <span className="preset-item__name" title={availability[preset.id]?.join("；")}>{preset.name}{availability[preset.id]?.length ? " · 暂不可执行" : ""}</span>
                             <span className="preset-item__meta">{presetSummary(preset)}</span>
                           </button>
                           <button

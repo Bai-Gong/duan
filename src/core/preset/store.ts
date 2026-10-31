@@ -22,6 +22,7 @@ export interface PresetStoreState {
    * ye＝进程内（H.264 解码+编码、音频直通；能力面外由翻译层提前拒绝）。
    */
   engine: "ffmpeg" | "ye";
+  legacyEngine?: "ffmpeg" | "ye";
 
   /** 入库并返回带 id 的完整预设（id＝crypto.randomUUID）。 */
   addPreset(draft: PresetDraft): Preset;
@@ -42,7 +43,7 @@ export const usePresetStore = create<PresetStoreState>()(
       customPresets: [],
       favorites: [],
       defaultOutputDir: "",
-      engine: "ffmpeg",
+      engine: "ye",
 
       addPreset: (draft) => {
         const preset: Preset = { ...draft, id: crypto.randomUUID(), builtin: false };
@@ -80,13 +81,18 @@ export const usePresetStore = create<PresetStoreState>()(
     }),
     {
       name: PRESET_STORAGE_KEY,
-      version: 1,
+      version: 2,
+        migrate: (persisted: unknown): Pick<PresetStoreState,"engine"|"legacyEngine"|"customPresets"|"favorites"|"defaultOutputDir"> => {
+          const previous = persisted as Pick<PresetStoreState,"engine"|"legacyEngine"|"customPresets"|"favorites"|"defaultOutputDir">;
+          return { ...previous, legacyEngine: previous.engine, engine: "ye" };
+        },
       // 只落数据字段，actions 不进 localStorage
       partialize: (s) => ({
         customPresets: s.customPresets,
         favorites: s.favorites,
         defaultOutputDir: s.defaultOutputDir,
         engine: s.engine,
+        legacyEngine:s.legacyEngine,
       }),
     },
   ),

@@ -31,7 +31,7 @@ serde_json = "1"
 # 路径依赖指到门面包本体（../../ye 是虚拟 workspace 清单，不可直接依赖）；
 # CI 上由 workflow 检出 Bai-Gong/ye 到兄弟目录 ../ye（与 fang alias 联调同一套路）。
 # feature 面与 ye-cli 对齐——mp4（容器）+ h264（解码+编码）；音频包直通不重编码，无需 aac feature。
-ye = { git = "https://github.com/Bai-Gong/ye.git", rev = "ba712826be9e489d439dd6c2276055d94d67c66c", default-features = false, features = ["mp4", "h264", "aac", "png"] }
+ye = { git = "https://github.com/Bai-Gong/ye.git", rev = "e30724896b8bc8e645b86d1585bb51acdcfef6c1", default-features = false, features = ["mp4", "h264", "aac", "png"] }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
@@ -48,3 +48,7 @@ strip = true
 [profile.dev.build-override]
 opt-level = 1
 debug = false
+
+[features]
+default = []
+compat-ffmpeg = []

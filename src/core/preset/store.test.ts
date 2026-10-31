@@ -159,7 +159,7 @@ describe("持久化（localStorage）", () => {
       "engine",
       "favorites",
     ]);
-    expect(saved.version).toBe(1);
+    expect(saved.version).toBe(2);
     expect(saved.state.favorites).toEqual(["builtin:mp3-320k"]);
     expect(saved.state.defaultOutputDir).toBe("D:/转码输出");
   });
@@ -179,4 +179,12 @@ describe("持久化（localStorage）", () => {
     expect(state().favorites).toEqual([added.id]);
     expect(state().defaultOutputDir).toBe("D:/转码输出");
   });
+});
+
+it("migrates the engine preference while preserving unsupported preset data",async()=>{
+  const preset={...makeDraft({container:"mp3",video:null,audio:{codec:"libmp3lame",sampleRate:44100,bitrateKbps:320}}),id:"saved-old",builtin:false};
+  testEnv.storage.setItem(PRESET_STORAGE_KEY,JSON.stringify({version:1,state:{engine:"ffmpeg",customPresets:[preset],favorites:[preset.id],defaultOutputDir:"D:/saved"}}));
+  await usePresetStore.persist.rehydrate();
+  expect(state().engine).toBe("ye");expect(state().legacyEngine).toBe("ffmpeg");
+  expect(state().customPresets).toEqual([preset]);expect(state().favorites).toEqual([preset.id]);expect(state().defaultOutputDir).toBe("D:/saved");
 });
