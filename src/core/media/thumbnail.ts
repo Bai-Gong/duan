@@ -22,3 +22,6 @@ export function getFrameUrl(path: string, timeUs = 0): Promise<string> {
   job.catch(() => cache.delete(key)); // 失败不占缓存位
   return job;
 }
+
+/** 严格冶代表帧，供纯冶接线与验收使用。 */
+export async function getFrameUrlYe(path: string,timeUs=0): Promise<string> { return assetUrl(await invoke<string>("extract_frame_ye",{path,timeUs})); }

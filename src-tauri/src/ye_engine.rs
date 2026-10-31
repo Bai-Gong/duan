@@ -18,7 +18,7 @@
 
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader, BufWriter};
+use std::io::BufReader;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
@@ -66,7 +66,9 @@ fn parse_ye_options(
     let size = match (width, height) {
         (Some(w), Some(h)) => {
             if w == 0 || h == 0 || w % 2 != 0 || h % 2 != 0 {
-                return Err(format!("目标尺寸须为正偶数，收到 {w}x{h}（H.264 4:2:0 要求）"));
+                return Err(format!(
+                    "目标尺寸须为正偶数，收到 {w}x{h}（H.264 4:2:0 要求）"
+                ));
             }
             Some((w, h))
         }
@@ -134,10 +136,7 @@ pub fn ye_convert(
 ) -> Result<ye::convert::ConvertStats, String> {
     let ctx = || format!("{} → {}", input.display(), output.display());
     let result = run_ye_convert(input, output, spec, cancel, progress);
-    if result.is_err() {
-        // 半成品清理：泵已随错误丢弃输出句柄，这里删残留文件（不存在时忽略）。
-        let _ = std::fs::remove_file(output);
-    }
+
     result.map_err(|e| format!("{}: {e}", ctx()))
 }
 
@@ -149,7 +148,9 @@ fn run_ye_convert(
     progress: &dyn Fn(i64, i64),
 ) -> Result<ye::convert::ConvertStats, String> {
     let in_file = File::open(input).map_err(|e| format!("{}: {e}", input.display()))?;
-    let out_file = File::create(output).map_err(|e| format!("{}: {e}", output.display()))?;
+    let transaction = ye::output::OutputTransaction::new(output)
+        .map_err(|e| format!("{}: {e}", output.display()))?;
+    let out_file = transaction.writer().map_err(|e| e.to_string())?;
 
     // 注册表显式构造（与 ye-cli 同款）：MP4 容器 + H.264/AAC 解码编码
     // 真工厂（音频直通路径用不到 AAC，重编码路径需要）。
@@ -175,19 +176,21 @@ fn run_ye_convert(
     } else {
         Some(&settings)
     };
-    ye::convert::convert(
+    let stats = ye::convert::convert(
         &containers,
         &codecs,
         Box::new(BufReader::new(in_file)),
         "mp4",
-        Box::new(BufWriter::new(out_file)),
+        Box::new(out_file),
         video,
         &spec.audio,
         ye::convert::filter_ops(),
         progress,
         cancel,
     )
-    .map_err(|e| e.to_string())
+    .map_err(|e| e.to_string())?;
+    transaction.commit().map_err(|e| e.to_string())?;
+    Ok(stats)
 }
 
 /// 跑转码（ye 引擎）：与 ffmpeg.rs 的 run_transcode 同一事件契约与取消语义。
@@ -311,16 +314,8 @@ mod tests {
     #[test]
     fn m3_补齐参数面_码率与剥轨() {
         // 视频码率 + 音频重编码
-        let spec = parse_ye_options(
-            None,
-            None,
-            Some(23),
-            Some(8000),
-            Some(256),
-            false,
-            false,
-        )
-        .unwrap();
+        let spec =
+            parse_ye_options(None, None, Some(23), Some(8000), Some(256), false, false).unwrap();
         assert_eq!(spec.video_bitrate_bps, Some(8_000_000));
         assert_eq!(
             spec.audio,
@@ -349,8 +344,12 @@ mod tests {
         // 宽高只给一轴
         assert!(parse_ye_options(Some(320), None, Some(23), None, None, false, false).is_err());
         // 奇数（H.264 4:2:0 不收）
-        assert!(parse_ye_options(Some(321), Some(240), Some(23), None, None, false, false).is_err());
-        assert!(parse_ye_options(Some(320), Some(241), Some(23), None, None, false, false).is_err());
+        assert!(
+            parse_ye_options(Some(321), Some(240), Some(23), None, None, false, false).is_err()
+        );
+        assert!(
+            parse_ye_options(Some(320), Some(241), Some(23), None, None, false, false).is_err()
+        );
         // 零
         assert!(parse_ye_options(Some(0), Some(240), Some(23), None, None, false, false).is_err());
         // CRF 越界 / 缺失
@@ -364,16 +363,7 @@ mod tests {
         );
         assert!(parse_ye_options(None, None, Some(23), None, Some(0), false, false).is_err());
         // 剥视频 + 尺寸
-        assert!(parse_ye_options(
-            Some(320),
-            Some(240),
-            Some(23),
-            None,
-            None,
-            true,
-            false
-        )
-        .is_err());
+        assert!(parse_ye_options(Some(320), Some(240), Some(23), None, None, true, false).is_err());
         // 剥音轨 + 音频码率
         assert!(parse_ye_options(None, None, Some(23), None, Some(128), false, true).is_err());
         // 剥光

@@ -55,3 +55,6 @@ export function probeMedia(path: string): Promise<MediaInfo> {
 export function ffmpegInfo(): Promise<FfmpegInfo> {
   return invoke<FfmpegInfo>("ffmpeg_info");
 }
+
+/** 严格冶探测，错误不回退。 */
+export function probeMediaYe(path: string): Promise<MediaInfo> { return invoke<MediaInfo>("probe_media_ye",{path}); }

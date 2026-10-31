@@ -6,6 +6,7 @@
 // tests/ye_engine_e2e.rs 直接调 ye_convert 做对拍（ffmpeg/probe 两模块
 // 无此需求，保持私有）。
 mod ffmpeg;
+pub mod media_ye;
 mod probe;
 pub mod ye_engine;
 
@@ -18,6 +19,8 @@ pub fn run() {
         .plugin(tauri_plugin_log::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             probe::probe_media,
+            media_ye::probe_media_ye,
+            media_ye::extract_frame_ye,
             ffmpeg::ffmpeg_info,
             ffmpeg::extract_frame,
             ffmpeg::run_transcode,
