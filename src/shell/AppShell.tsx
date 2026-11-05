@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { isTauri } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { PanelDivider } from "./PanelDivider";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   ArrowRight,
   AudioLines,
@@ -63,8 +66,16 @@ const navigation = [
 ] as const;
 
 export function AppShell() {
+  const [leftWidth, setLeftWidth] = useState(190);
+  const [rightWidth, setRightWidth] = useState(260);
   const [page, setPage] = useState<Page>("queue");
   const [dark, setDark] = useState(false);
+  useEffect(() => {
+    if (isTauri())
+      void getCurrentWindow()
+        .setTheme(dark ? "dark" : "light")
+        .catch(console.warn);
+  }, [dark]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("全部");
   const [selected, setSelected] = useState(0);
@@ -78,7 +89,7 @@ export function AppShell() {
   const current = presets[selected];
   return (
     <div className="app-shell" data-theme={dark ? "dark" : "light"}>
-      <header className="top-bar">
+      <header className="top-bar" data-tauri-drag-region>
         <div className="brand">
           <span className="brand-mark">锻</span>
           <strong>
@@ -104,7 +115,15 @@ export function AppShell() {
           </button>
         </div>
       </header>
-      <div className="workspace">
+      <div
+        className="workspace"
+        style={
+          {
+            "--left-width": `${leftWidth}px`,
+            "--right-width": `${rightWidth}px`,
+          } as CSSProperties
+        }
+      >
         <nav className="workspace-nav" aria-label="主导航">
           <span className="nav-caption">工作区</span>
           {navigation.map(({ id, label, icon: Icon }) => (
@@ -134,6 +153,14 @@ export function AppShell() {
             <span className="version">百工创作工具集 · 0.1</span>
           </div>
         </nav>
+        <PanelDivider
+          side="left"
+          width={leftWidth}
+          min={160}
+          max={300}
+          initial={190}
+          onResize={setLeftWidth}
+        />
         <main className="main-content">
           <div className="breadcrumb">
             工作区 <ChevronRight size={13} />{" "}
@@ -260,13 +287,17 @@ export function AppShell() {
             </>
           )}
         </main>
+        <PanelDivider
+          side="right"
+          width={rightWidth}
+          min={220}
+          max={400}
+          initial={260}
+          onResize={setRightWidth}
+        />
         <aside className="inspector glass">
           <div className="inspector-title">
-            <SlidersHorizontal size={17} />
             <strong>{page === "presets" ? "预设详情" : "输出概览"}</strong>
-          </div>
-          <div className="inspector-symbol">
-            <current.icon size={29} />
           </div>
           <h2>{current.name}</h2>
           <p className="inspector-description">{current.detail}</p>

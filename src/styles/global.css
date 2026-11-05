@@ -333,16 +333,6 @@ h1 {
   gap: 9px;
   font-size: 12px;
 }
-.inspector-symbol {
-  display: grid;
-  place-items: center;
-  width: 60px;
-  height: 60px;
-  border-radius: 16px;
-  background: var(--soft);
-  color: var(--accent);
-  margin-top: 34px;
-}
 .inspector h2 {
   font-size: 19px;
   margin-top: 20px;
@@ -740,4 +730,98 @@ dd {
 }
 .page-heading {
   margin-bottom: 22px;
+}
+
+/* Native AppKit material, matching Zhi: the WebView must not cover the desktop. */
+:root[data-native-material="macos"],
+:root[data-native-material="macos"] body {
+  background: transparent;
+}
+:root[data-native-material="macos"] .app-shell {
+  --glass: #ffffff30;
+  --edge: #ffffff70;
+  background: #f1f5f526;
+  border-radius: 12px;
+  overflow: hidden;
+}
+:root[data-native-material="macos"] .app-shell[data-theme="dark"] {
+  --glass: #17282d38;
+  --edge: #ffffff24;
+  background: #11222838;
+}
+:root[data-native-material="macos"] .top-bar {
+  height: 44px;
+  padding: 0 18px 0 88px;
+  background: #ffffff0a;
+}
+:root[data-native-material="macos"] .brand-mark,
+:root[data-native-material="macos"] .brand-caption {
+  display: none;
+}
+:root[data-native-material="macos"] .workspace-nav {
+  background: #ffffff0a;
+}
+.workspace {
+  grid-template-columns: var(--left-width, 190px) 6px minmax(0, 1fr) 6px var(
+      --right-width,
+      260px
+    );
+}
+.workspace-nav,
+.inspector {
+  min-width: 0;
+}
+.inspector {
+  border-left: 0;
+}
+.workspace-nav {
+  border-right: 0;
+}
+.panel-divider {
+  cursor: col-resize;
+  touch-action: none;
+  position: relative;
+  outline-offset: -2px;
+}
+.panel-divider::after {
+  content: "";
+  position: absolute;
+  inset: 0 2px;
+  background: var(--border);
+  transition: background 0.15s;
+}
+.panel-divider:hover::after,
+.panel-divider.dragging::after,
+.panel-divider:focus-visible::after {
+  background: var(--accent);
+}
+.workspace:has(.panel-divider.dragging) {
+  user-select: none;
+  cursor: col-resize;
+}
+@media (max-width: 950px) {
+  .workspace {
+    grid-template-columns: var(--left-width, 190px) 6px minmax(0, 1fr);
+  }
+  .panel-divider--right {
+    display: none;
+  }
+}
+@media (max-width: 650px) {
+  .workspace {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .panel-divider {
+    display: none;
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-native-material="macos"] .app-shell {
+    background: var(--bg);
+    --glass: var(--panel);
+  }
+  :root[data-native-material="macos"] .top-bar,
+  :root[data-native-material="macos"] .workspace-nav {
+    background: var(--panel);
+  }
 }
