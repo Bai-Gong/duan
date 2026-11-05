@@ -12,6 +12,7 @@
     "package:windows": "tauri build --bundles nsis && node scripts/verify-pure-package.mjs"
   },
   "dependencies": {
+    "@baigong/fang": "file:vendor/baigong-fang-0.1.1.tgz",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-dialog": "^2.8.3",
     "@tauri-apps/plugin-fs": "^2.7.1",

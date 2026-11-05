@@ -1,3 +1,4 @@
+import { applyResolvedTheme, applyNativeTheme } from "@baigong/fang/glass";
 import { open } from "@tauri-apps/plugin-dialog";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -72,10 +73,9 @@ export function AppShell() {
   const [page, setPage] = useState<Page>("queue");
   const [dark, setDark] = useState(false);
   useEffect(() => {
-    if (isTauri())
-      void getCurrentWindow()
-        .setTheme(dark ? "dark" : "light")
-        .catch(console.warn);
+    const theme = dark ? "dark" : "light";
+    applyResolvedTheme(theme);
+    void applyNativeTheme(theme, isTauri() ? value => getCurrentWindow().setTheme(value) : undefined).catch(console.warn);
   }, [dark]);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("全部");
@@ -137,8 +137,8 @@ export function AppShell() {
   }, [settings]);
   const current = presets[page === "queue" ? activeGroup.preset : selected];
   return (
-    <div className="app-shell" data-theme={dark ? "dark" : "light"}>
-      <header className="top-bar" data-tauri-drag-region>
+    <div className="app-shell fang-glass-shell">
+      <header className="top-bar fang-glass-surface fang-glass-chrome" data-tauri-drag-region>
         <div className="brand">
           <span className="brand-mark">锻</span>
           <strong>
@@ -173,7 +173,7 @@ export function AppShell() {
           } as CSSProperties
         }
       >
-        <nav className="workspace-nav" aria-label="主导航">
+        <nav className="workspace-nav fang-glass-surface fang-glass-chrome" aria-label="主导航">
           <span className="nav-caption">工作区</span>
           {navigation.map(({ id, label, icon: Icon }) => (
             <button
@@ -238,7 +238,7 @@ export function AppShell() {
                 {groups.map((group) => (
                   <section
                     key={group.id}
-                    className={`queue-group glass ${activeGroupId === group.id ? "queue-group--active" : ""}`}
+                    className={`queue-group glass fang-glass-surface ${activeGroupId === group.id ? "queue-group--active" : ""}`}
                     aria-label={group.name}
                   >
                     <div className="group-header">
@@ -361,7 +361,7 @@ export function AppShell() {
                     `${preset.name}${preset.detail}`.includes(query.trim()) && (
                       <button
                         key={preset.name}
-                        className={`preset-card glass ${selected === i ? "chosen" : ""}`}
+                        className={`preset-card glass fang-glass-surface ${selected === i ? "chosen" : ""}`}
                         aria-pressed={selected === i}
                         onClick={() => {
                           setSelected(i);
@@ -391,7 +391,7 @@ export function AppShell() {
                   (filter === "全部" || p.type === filter) &&
                   `${p.name}${p.detail}`.includes(query.trim()),
               ) && (
-                <div className="empty-state glass">
+                <div className="empty-state glass fang-glass-surface">
                   <Search size={28} />
                   <h2>没有匹配的预设</h2>
                   <p>试试其他关键词，或切换分类。</p>
@@ -413,7 +413,7 @@ export function AppShell() {
               initial={260}
               onResize={setRightWidth}
             />
-            <aside className="inspector glass">
+            <aside className="inspector glass fang-glass-surface">
               <div className="inspector-title">
                 <strong>{page === "presets" ? "预设详情" : "当前分组"}</strong>
                 <button
@@ -548,7 +548,7 @@ export function AppShell() {
       </footer>
       <dialog
         ref={dialogRef}
-        className="settings-dialog glass"
+        className="settings-dialog glass fang-glass-surface"
         aria-labelledby="settings-title"
         onCancel={() => setSettings(false)}
         onClick={(e) => {

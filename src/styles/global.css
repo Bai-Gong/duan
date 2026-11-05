@@ -47,50 +47,31 @@ p {
 button svg {
   flex-shrink: 0;
 }
-.app-shell {
-  --bg: #edf0f3;
-  --panel: #f8fafbe6;
-  --glass: #ffffff8f;
-  --edge: #ffffffc9;
-  --border: #c5d3d573;
-  --text: #253e40;
-  --secondary: #5b7073;
-  --muted: #728488;
-  --accent: #256c65;
-  --soft: #d8eae5;
-  --shadow: 0 12px 36px #314c5710;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  color: var(--text);
-  background:
-    radial-gradient(ellipse at 80% 15%, #b4d8d360, transparent 52%),
-    radial-gradient(ellipse at 30% 85%, #cbc2e350, transparent 50%), var(--bg);
+:root[data-fang-glass] {
+  --fang-glass-app-background: radial-gradient(ellipse at 80% 15%, #b4d8d360, transparent 52%), radial-gradient(ellipse at 30% 85%, #cbc2e350, transparent 50%), var(--fang-glass-bg);
 }
-.app-shell[data-theme="dark"] {
-  color-scheme: dark;
-  --bg: #17282d;
-  --panel: #22363ded;
-  --glass: #233b43a6;
-  --edge: #8aafaf30;
-  --border: #72929542;
-  --text: #e4efed;
-  --secondary: #b0c4c6;
-  --muted: #91abad;
-  --accent: #90d8c4;
-  --soft: #31534c;
-  --shadow: 0 12px 36px #07191f33;
-  background:
-    radial-gradient(ellipse at 80% 15%, #3d736330, transparent 52%),
-    radial-gradient(ellipse at 30% 85%, #69547b25, transparent 50%), var(--bg);
+:root[data-fang-glass][data-theme="dark"] {
+  --fang-glass-app-background: radial-gradient(ellipse at 80% 15%, #3d736330, transparent 52%), radial-gradient(ellipse at 30% 85%, #69547b25, transparent 50%), var(--fang-glass-bg);
+}
+.app-shell {
+  --bg: var(--fang-glass-bg);
+  --panel: var(--fang-glass-panel);
+  --glass: var(--fang-glass-surface);
+  --edge: var(--fang-glass-edge);
+  --border: var(--fang-glass-border);
+  --text: var(--fang-glass-text);
+  --secondary: var(--fang-glass-secondary);
+  --muted: var(--fang-glass-muted);
+  --accent: var(--fang-glass-accent);
+  --soft: var(--fang-glass-soft);
+  --shadow: var(--fang-glass-shadow);
+  height: 100%; display:flex; flex-direction:column; color:var(--text);
 }
 .glass,
 .top-bar,
 .workspace-nav {
   background: var(--glass);
   border: 1px solid var(--edge);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
 }
 .glass {
   border-radius: 16px;
@@ -682,21 +663,8 @@ dd {
     display: none;
   }
 }
-@supports not (backdrop-filter: blur(1px)) {
-  .glass,
-  .top-bar,
-  .workspace-nav {
-    background: var(--panel);
-  }
-}
-@media (prefers-reduced-transparency: reduce) {
-  .glass,
-  .top-bar,
-  .workspace-nav {
-    background: var(--panel);
-    backdrop-filter: none;
-  }
-}
+
+
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
@@ -732,35 +700,10 @@ dd {
   margin-bottom: 22px;
 }
 
-/* Native AppKit material, matching Zhi: the WebView must not cover the desktop. */
-:root[data-native-material="macos"],
-:root[data-native-material="macos"] body {
-  background: transparent;
-}
-:root[data-native-material="macos"] .app-shell {
-  --glass: #ffffff30;
-  --edge: #ffffff70;
-  background: #f1f5f526;
-  border-radius: 12px;
-  overflow: hidden;
-}
-:root[data-native-material="macos"] .app-shell[data-theme="dark"] {
-  --glass: #17282d38;
-  --edge: #ffffff24;
-  background: #11222838;
-}
-:root[data-native-material="macos"] .top-bar {
-  height: 44px;
-  padding: 0 18px 0 88px;
-  background: #ffffff0a;
-}
+/* Application-specific titlebar geometry stays in Duan. */
+:root[data-native-material="macos"] .top-bar { height:44px; padding:0 18px 0 88px; }
 :root[data-native-material="macos"] .brand-mark,
-:root[data-native-material="macos"] .brand-caption {
-  display: none;
-}
-:root[data-native-material="macos"] .workspace-nav {
-  background: #ffffff0a;
-}
+:root[data-native-material="macos"] .brand-caption { display:none; }
 .workspace {
   grid-template-columns: var(--left-width, 190px) 6px minmax(0, 1fr) 6px var(
       --right-width,
@@ -815,16 +758,7 @@ dd {
     display: none;
   }
 }
-@media (prefers-reduced-transparency: reduce) {
-  :root[data-native-material="macos"] .app-shell {
-    background: var(--bg);
-    --glass: var(--panel);
-  }
-  :root[data-native-material="macos"] .top-bar,
-  :root[data-native-material="macos"] .workspace-nav {
-    background: var(--panel);
-  }
-}
+
 
 .group-summary {
   display: flex;
