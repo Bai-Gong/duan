@@ -79,6 +79,29 @@ export function AppShell() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("全部");
   const [selected, setSelected] = useState(0);
+  // Preset browsing is separate from a group's output choice.
+  const [groups, setGroups] = useState([{ id: 1, name: "分组 1", preset: 0 }]);
+  const [activeGroupId, setActiveGroupId] = useState(1);
+  const nextGroupId = useRef(2);
+  const activeGroup =
+    groups.find((group) => group.id === activeGroupId) ?? groups[0];
+  const updateGroup = (
+    id: number,
+    patch: Partial<{ name: string; preset: number }>,
+  ) =>
+    setGroups((previous) =>
+      previous.map((group) =>
+        group.id === id ? { ...group, ...patch } : group,
+      ),
+    );
+  const addGroup = () => {
+    const id = nextGroupId.current++;
+    setGroups((previous) => [
+      ...previous,
+      { id, name: `分组 ${id}`, preset: 0 },
+    ]);
+    setActiveGroupId(id);
+  };
   const [settings, setSettings] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -86,7 +109,7 @@ export function AppShell() {
     if (settings) dialog?.showModal();
     else dialog?.close();
   }, [settings]);
-  const current = presets[selected];
+  const current = presets[page === "queue" ? activeGroup.preset : selected];
   return (
     <div className="app-shell" data-theme={dark ? "dark" : "light"}>
       <header className="top-bar" data-tauri-drag-region>
@@ -171,43 +194,88 @@ export function AppShell() {
               <div className="page-heading">
                 <div>
                   <h1>转码队列</h1>
-                  <p>集中查看素材、输出预设与任务状态。</p>
+                  <p>按组整理视频，每组使用独立的输出预设。</p>
                 </div>
-                <button className="primary-button" disabled>
-                  <FolderOpen size={17} />
-                  添加素材
+                <button className="primary-button" onClick={addGroup}>
+                  新建分组
                 </button>
               </div>
-              <section className="queue-panel glass">
-                <div className="queue-toolbar">
-                  <strong>
-                    全部任务 <span className="count">0</span>
-                  </strong>
-                  <span>等待媒体处理开放</span>
-                </div>
-                <div className="table-head">
-                  <span>素材名称</span>
-                  <span>输出预设</span>
-                  <span>状态</span>
-                </div>
-                <div className="empty-state">
-                  <div className="empty-icon">
-                    <ListVideo size={34} />
-                  </div>
-                  <h2>暂无任务</h2>
-                  <p>等待冶接入后开放素材导入与转码。</p>
-                  <span className="preview-badge">
-                    当前不创建或执行转码任务
-                  </span>
-                </div>
-                <div className="queue-footer">
-                  <span>0 个任务 · 尚未开始</span>
-                  <button className="primary-button" disabled>
-                    开始队列
-                    <ArrowRight size={15} />
-                  </button>
-                </div>
-              </section>
+              <div className="group-summary">
+                <span>{groups.length} 个分组 · 0 个视频</span>
+                <span>分组设置仅保留在本次会话</span>
+              </div>
+              <div className="group-list">
+                {groups.map((group) => (
+                  <section
+                    key={group.id}
+                    className={`queue-group glass ${activeGroupId === group.id ? "queue-group--active" : ""}`}
+                    aria-label={group.name}
+                  >
+                    <div className="group-header">
+                      <button
+                        className="group-select"
+                        aria-pressed={activeGroupId === group.id}
+                        onClick={() => setActiveGroupId(group.id)}
+                      >
+                        <strong>{group.name}</strong>
+                        <span>0 个视频</span>
+                      </button>
+                      <label className="group-preset">
+                        输出预设
+                        <select
+                          aria-label={`${group.name}的输出预设`}
+                          value={group.preset}
+                          onFocus={() => setActiveGroupId(group.id)}
+                          onChange={(event) => {
+                            setActiveGroupId(group.id);
+                            updateGroup(group.id, {
+                              preset: Number(event.target.value),
+                            });
+                          }}
+                        >
+                          {presets.map((preset, index) => (
+                            <option key={preset.name} value={index}>
+                              {preset.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        className="icon-button"
+                        aria-label={`移除${group.name}`}
+                        disabled={groups.length === 1}
+                        onClick={() => {
+                          const remaining = groups.filter(
+                            (item) => item.id !== group.id,
+                          );
+                          setGroups(remaining);
+                          if (activeGroupId === group.id)
+                            setActiveGroupId(remaining[0].id);
+                        }}
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div className="group-empty">
+                      <span>此组暂无视频</span>
+                      <button className="text-button" disabled>
+                        添加到此组
+                      </button>
+                    </div>
+                    <div className="group-caption">
+                      组内视频统一使用「{presets[group.preset].name}」 ·
+                      素材导入尚未开放
+                    </div>
+                  </section>
+                ))}
+              </div>
+              <div className="queue-footer group-footer">
+                <span>0 个任务 · 尚未开始</span>
+                <button className="primary-button" disabled>
+                  开始全部分组
+                  <ArrowRight size={15} />
+                </button>
+              </div>
             </>
           ) : (
             <>
@@ -297,11 +365,63 @@ export function AppShell() {
         />
         <aside className="inspector glass">
           <div className="inspector-title">
-            <strong>{page === "presets" ? "预设详情" : "输出概览"}</strong>
+            <strong>{page === "presets" ? "预设详情" : "当前分组"}</strong>
           </div>
+          {page === "queue" && (
+            <div className="group-settings">
+              <label>
+                分组名称
+                <input
+                  aria-label="分组名称"
+                  value={activeGroup.name}
+                  maxLength={40}
+                  onChange={(event) =>
+                    updateGroup(activeGroup.id, { name: event.target.value })
+                  }
+                  onBlur={() => {
+                    if (!activeGroup.name.trim())
+                      updateGroup(activeGroup.id, {
+                        name: `分组 ${activeGroup.id}`,
+                      });
+                  }}
+                />
+              </label>
+              <p>以下设置仅作用于此组的所有视频，不影响其他分组。</p>
+            </div>
+          )}
           <h2>{current.name}</h2>
           <p className="inspector-description">{current.detail}</p>
           <span className="preview-badge">规划中</span>
+          {page === "presets" && (
+            <div className="group-settings">
+              <label>
+                应用到分组
+                <select
+                  aria-label="预设应用目标分组"
+                  value={activeGroupId}
+                  onChange={(event) =>
+                    setActiveGroupId(Number(event.target.value))
+                  }
+                >
+                  {groups.map((group) => (
+                    <option key={group.id} value={group.id}>
+                      {group.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  updateGroup(activeGroup.id, { preset: selected });
+                  setPage("queue");
+                }}
+              >
+                应用到此组
+              </button>
+              <p>仅更新所选组。浏览预设不会修改其他分组。</p>
+            </div>
+          )}
           <div className="detail-section">
             <h3>输出格式</h3>
             <dl>
@@ -385,7 +505,7 @@ export function AppShell() {
         <div className="settings-note">
           <strong>本轮：基础界面</strong>
           <p>
-            可切换页面、浏览与筛选规划预设。素材导入、媒体预览、转码和文件保存尚未开放，等待冶开发完成后接入。
+            可新建、命名和移除空分组，为每组独立选择规划预设。素材导入、媒体预览、转码和文件保存尚未开放，等待冶开发完成后接入。
           </p>
         </div>
       </dialog>
