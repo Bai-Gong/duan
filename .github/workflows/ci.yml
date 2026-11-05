@@ -23,25 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # fang 走 alias 联调轨（vite alias + tsconfig paths 指向 ../fang/src），
-      # runner 只有本仓库，须把 fang 检出为兄弟目录，否则 tsc 报 Cannot find module '@baigong/fang'。
-      # 仓库私有化或 fang 上 registry 后此步骤移除。
-      - name: 检出 fang（alias 联调的兄弟仓库）
-        uses: actions/checkout@v4
-        with:
-          repository: Bai-Gong/fang
-          ref: 21c522dba3c1444060c5cd6ebd4e6760d21f9b38
-          path: fang
-      # checkout 只允许工作区内路径，检出到 fang/ 后挪到兄弟目录 ../fang
-      - name: fang 挪到兄弟目录
-        run: mv fang ../fang
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-      # fang 源码里的 import "react" 从 fang 自己的 node_modules 向上解析，裸检出会 TS2307
-      - name: 安装 fang 依赖
-        run: npm ci --prefix ../fang
       - name: 安装并构建、测试
         run: |
           npm ci
@@ -62,24 +47,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # ye 兄弟仓库检出（M3 接线轨）：Cargo.toml 的 ye 引擎路径依赖指
-      # ../../ye/crates/ye（门面包本体；ye 仓库根是虚拟 workspace 清单），
-      # runner 只有本仓库，须把 ye 检出为兄弟目录 ../ye。ref=develop 随子模块
-      # 跟踪分支（与本地检出存在漂移窗口，fang 同款取舍）。
-      - name: 检出 ye（ye 引擎依赖的兄弟仓库）
-        uses: actions/checkout@v4
-        with:
-          repository: Bai-Gong/ye
-          ref: e30724896b8bc8e645b86d1585bb51acdcfef6c1
-          path: ye
-      - name: ye 挪到兄弟目录
-        run: mv ye ../ye
       - name: 安装 Tauri 系统依赖
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev \
-            libxdo-dev libayatana-appindicator3-dev libssl-dev pkg-config ffmpeg
+            libxdo-dev libayatana-appindicator3-dev libssl-dev pkg-config
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
@@ -89,23 +62,15 @@ jobs:
           node-version: 22
       - name: cargo check
         run: cargo check --manifest-path src-tauri/Cargo.toml --locked
-      - name: 冶后端与无工具运行验收
+      - name: 桌面外壳检查
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
 
   windows-package:
-    name: 纯冶安装包 (Windows)
+    name: 界面预览安装包 (Windows)
     needs: [web-gate, rust-gate]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: 检出固定坊提交
-        uses: actions/checkout@v4
-        with:
-          repository: Bai-Gong/fang
-          ref: 21c522dba3c1444060c5cd6ebd4e6760d21f9b38
-          path: fang
-      - name: 坊移至兄弟目录
-        run: Move-Item -LiteralPath fang -Destination ../fang
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -116,14 +81,13 @@ jobs:
           workspaces: src-tauri
       - name: 安装依赖
         run: |
-          npm ci --prefix ../fang
           npm ci
       # 不下载 FFmpeg；打包脚本会检查实际 NSIS 载荷清单。
-      - name: 构建并检查纯冶安装包
+      - name: 构建并检查界面预览安装包
         run: npm run package:windows
       - uses: actions/upload-artifact@v4
         with:
-          name: pure-ye-windows-${{ github.sha }}
+          name: ui-preview-windows-${{ github.sha }}
           path: src-tauri/target/release/bundle/nsis/*.exe
           retention-days: 14
           if-no-files-found: error

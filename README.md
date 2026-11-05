@@ -1,19 +1,24 @@
 # 百工·锻 (Duan)
 
-媒体编码/转码工具，对标 Adobe Media Encoder。
+Tauri + React 媒体转码桌面工具，对标 Adobe Media Encoder。
 
-技术栈：Tauri + React。
+## 当前阶段：基础界面
 
-## 当前联动基线
+2026-11-05 起暂停实际媒体功能，等待百工·冶完成后再接入。界面参照百工·纸的浅灰、青绿与毛玻璃面板，保持桌面工具简洁清晰：默认进入转码队列，左侧导航，中央任务或预设列表，右侧输出概览。
 
-默认运行时使用冶，正式安装包不携带 FFmpeg/ffprobe，也不查找外部工具。支持经验证的 MP4/M4A、H.264 progressive 8-bit 4:2:0 与 AAC-LC 单/双声道。视频输出支持有理数帧率，音频支持44.1/48kHz重采样；预设由 Rust 对实际容器和码流再次检查，不按扩展名放行。不支持的旧预设保留并标记暂不可执行，旧引擎偏好迁移时留档，不改写预设参数。
+已实现：队列空状态、规划预设展示、分类与搜索、选中预设详情、浅色/深色外观、设置对话框。导入、转码、预览与文件保存尚未开放，按钮禁用并显示原因；不生成虚假任务或进度，不修改原有用户预设数据。
 
-日常门禁：`npm ci`、`npm run build`、`npm test`、`cargo test --manifest-path src-tauri/Cargo.toml --locked`。测试需要外部 FFmpeg 生成参考素材；它只属于开发/CI环境。`pure_runtime` 集成测试生成素材后启动清空 PATH 的子进程，验收纯冶探测、缩略图与十项成功/拒绝/失败/取消及输出保护场景。
+FFmpeg 的实现、下载脚本、兼容开关、命令及相关测试已移除。当前桌面外壳不依赖冶、不注册媒体命令。历史媒体实现可从 `52499b1` 及此前提交查看，不作为当前可用功能。
 
-Windows 打包：`npm run package:windows`。显式开发兼容构建：`npm run dev:compat`；默认 feature 为空。冶固定至 Cargo.toml 的已推送 rev，Cargo.lock 与之一起提交。坊由父仓库固定指针，CI钉同一提交。
+## 开发与检查
 
-本轮代码验收不等于干净 Windows 安装验收；未完成的安装环境和人工预览检查见父仓库联动施工记录。不自动推送 qa/main。
+```bash
+npm ci
+npm run tauri dev
+npm run build
+cargo check --manifest-path src-tauri/Cargo.toml --locked
+```
 
-产品分析见 [docs/产品分析.md](docs/产品分析.md)。
+`npm run dev` 用于浏览器界面检查；产品以 Tauri 桌面窗口为准。`npm test` 当前没有测试文件（旧媒体测试随执行实现移除），不代表媒体能力验收通过。Windows 安装包：`npm run package:windows`。
 
-属于「百工」项目集群，约定参见上级目录 [AGENTS.md](../AGENTS.md)。
+整体规划与接入边界见 [开发计划](docs/开发计划.md)。旧产品研究见 [产品分析](docs/产品分析.md)，其中能力清单不代表当前可用功能。
