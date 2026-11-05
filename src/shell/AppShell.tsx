@@ -1,3 +1,4 @@
+import { open } from "@tauri-apps/plugin-dialog";
 import { isTauri } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { PanelDivider } from "./PanelDivider";
@@ -80,14 +81,23 @@ export function AppShell() {
   const [filter, setFilter] = useState("全部");
   const [selected, setSelected] = useState(0);
   // Preset browsing is separate from a group's output choice.
-  const [groups, setGroups] = useState([{ id: 1, name: "分组 1", preset: 0 }]);
+  const [groups, setGroups] = useState([
+    { id: 1, name: "分组 1", preset: 0, outputDir: "" },
+  ]);
   const [activeGroupId, setActiveGroupId] = useState(1);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [folderError, setFolderError] = useState("");
+  const showGroup = (id: number) => {
+    setActiveGroupId(id);
+    setDetailsOpen(true);
+    setFolderError("");
+  };
   const nextGroupId = useRef(2);
   const activeGroup =
     groups.find((group) => group.id === activeGroupId) ?? groups[0];
   const updateGroup = (
     id: number,
-    patch: Partial<{ name: string; preset: number }>,
+    patch: Partial<{ name: string; preset: number; outputDir: string }>,
   ) =>
     setGroups((previous) =>
       previous.map((group) =>
@@ -98,9 +108,25 @@ export function AppShell() {
     const id = nextGroupId.current++;
     setGroups((previous) => [
       ...previous,
-      { id, name: `分组 ${id}`, preset: 0 },
+      { id, name: `分组 ${id}`, preset: 0, outputDir: "" },
     ]);
     setActiveGroupId(id);
+    setDetailsOpen(false);
+  };
+  const chooseOutputDir = async () => {
+    const groupId = activeGroup.id;
+    setFolderError("");
+    try {
+      const directory = await open({
+        directory: true,
+        multiple: false,
+        title: `选择${activeGroup.name}的保存位置`,
+      });
+      if (typeof directory === "string")
+        updateGroup(groupId, { outputDir: directory });
+    } catch {
+      setFolderError("无法打开目录选择器，可直接输入保存路径。");
+    }
   };
   const [settings, setSettings] = useState(false);
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -139,7 +165,7 @@ export function AppShell() {
         </div>
       </header>
       <div
-        className="workspace"
+        className={`workspace ${detailsOpen ? "" : "workspace--details-closed"}`}
         style={
           {
             "--left-width": `${leftWidth}px`,
@@ -154,7 +180,11 @@ export function AppShell() {
               key={id}
               className={`nav-item ${page === id ? "active" : ""}`}
               aria-current={page === id ? "page" : undefined}
-              onClick={() => setPage(id)}
+              onClick={() => {
+                setPage(id);
+                setDetailsOpen(false);
+                setFolderError("");
+              }}
             >
               <Icon size={19} />
               {label}
@@ -215,10 +245,17 @@ export function AppShell() {
                       <button
                         className="group-select"
                         aria-pressed={activeGroupId === group.id}
-                        onClick={() => setActiveGroupId(group.id)}
+                        onClick={() => showGroup(group.id)}
                       >
                         <strong>{group.name}</strong>
                         <span>0 个视频</span>
+                      </button>
+                      <button
+                        className="text-button"
+                        aria-label={`查看${group.name}详情`}
+                        onClick={() => showGroup(group.id)}
+                      >
+                        详情
                       </button>
                       <label className="group-preset">
                         输出预设
@@ -249,8 +286,10 @@ export function AppShell() {
                             (item) => item.id !== group.id,
                           );
                           setGroups(remaining);
-                          if (activeGroupId === group.id)
+                          if (activeGroupId === group.id) {
                             setActiveGroupId(remaining[0].id);
+                            setDetailsOpen(false);
+                          }
                         }}
                       >
                         <X size={16} />
@@ -261,6 +300,12 @@ export function AppShell() {
                       <button className="text-button" disabled>
                         添加到此组
                       </button>
+                    </div>
+                    <div
+                      className="group-output"
+                      title={group.outputDir || "尚未设置"}
+                    >
+                      保存位置：{group.outputDir || "尚未设置"}
                     </div>
                     <div className="group-caption">
                       组内视频统一使用「{presets[group.preset].name}」 ·
@@ -318,7 +363,10 @@ export function AppShell() {
                         key={preset.name}
                         className={`preset-card glass ${selected === i ? "chosen" : ""}`}
                         aria-pressed={selected === i}
-                        onClick={() => setSelected(i)}
+                        onClick={() => {
+                          setSelected(i);
+                          setDetailsOpen(true);
+                        }}
                       >
                         <div className="preset-card-top">
                           <preset.icon size={25} />
@@ -355,107 +403,141 @@ export function AppShell() {
             </>
           )}
         </main>
-        <PanelDivider
-          side="right"
-          width={rightWidth}
-          min={220}
-          max={400}
-          initial={260}
-          onResize={setRightWidth}
-        />
-        <aside className="inspector glass">
-          <div className="inspector-title">
-            <strong>{page === "presets" ? "预设详情" : "当前分组"}</strong>
-          </div>
-          {page === "queue" && (
-            <div className="group-settings">
-              <label>
-                分组名称
-                <input
-                  aria-label="分组名称"
-                  value={activeGroup.name}
-                  maxLength={40}
-                  onChange={(event) =>
-                    updateGroup(activeGroup.id, { name: event.target.value })
-                  }
-                  onBlur={() => {
-                    if (!activeGroup.name.trim())
-                      updateGroup(activeGroup.id, {
-                        name: `分组 ${activeGroup.id}`,
-                      });
-                  }}
-                />
-              </label>
-              <p>以下设置仅作用于此组的所有视频，不影响其他分组。</p>
-            </div>
-          )}
-          <h2>{current.name}</h2>
-          <p className="inspector-description">{current.detail}</p>
-          <span className="preview-badge">规划中</span>
-          {page === "presets" && (
-            <div className="group-settings">
-              <label>
-                应用到分组
-                <select
-                  aria-label="预设应用目标分组"
-                  value={activeGroupId}
-                  onChange={(event) =>
-                    setActiveGroupId(Number(event.target.value))
-                  }
+        {detailsOpen && (
+          <>
+            <PanelDivider
+              side="right"
+              width={rightWidth}
+              min={220}
+              max={400}
+              initial={260}
+              onResize={setRightWidth}
+            />
+            <aside className="inspector glass">
+              <div className="inspector-title">
+                <strong>{page === "presets" ? "预设详情" : "当前分组"}</strong>
+                <button
+                  className="icon-button"
+                  aria-label="关闭详情"
+                  onClick={() => setDetailsOpen(false)}
                 >
-                  {groups.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                className="primary-button"
-                onClick={() => {
-                  updateGroup(activeGroup.id, { preset: selected });
-                  setPage("queue");
-                }}
-              >
-                应用到此组
-              </button>
-              <p>仅更新所选组。浏览预设不会修改其他分组。</p>
-            </div>
-          )}
-          <div className="detail-section">
-            <h3>输出格式</h3>
-            <dl>
-              <div>
-                <dt>容器</dt>
-                <dd>{current.format}</dd>
+                  <X size={16} />
+                </button>
               </div>
-              <div>
-                <dt>视频编码</dt>
-                <dd>{current.video}</dd>
+              {page === "queue" && (
+                <div className="group-settings">
+                  <label>
+                    分组名称
+                    <input
+                      aria-label="分组名称"
+                      value={activeGroup.name}
+                      maxLength={40}
+                      onChange={(event) =>
+                        updateGroup(activeGroup.id, {
+                          name: event.target.value,
+                        })
+                      }
+                      onBlur={() => {
+                        if (!activeGroup.name.trim())
+                          updateGroup(activeGroup.id, {
+                            name: `分组 ${activeGroup.id}`,
+                          });
+                      }}
+                    />
+                  </label>
+                  <p>以下设置仅作用于此组的所有视频，不影响其他分组。</p>
+                </div>
+              )}
+              <h2>{current.name}</h2>
+              <p className="inspector-description">{current.detail}</p>
+              <span className="preview-badge">规划中</span>
+              {page === "presets" && (
+                <div className="group-settings">
+                  <label>
+                    应用到分组
+                    <select
+                      aria-label="预设应用目标分组"
+                      value={activeGroupId}
+                      onChange={(event) =>
+                        setActiveGroupId(Number(event.target.value))
+                      }
+                    >
+                      {groups.map((group) => (
+                        <option key={group.id} value={group.id}>
+                          {group.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    className="primary-button"
+                    onClick={() => {
+                      updateGroup(activeGroup.id, { preset: selected });
+                      setPage("queue");
+                    }}
+                  >
+                    应用到此组
+                  </button>
+                  <p>仅更新所选组。浏览预设不会修改其他分组。</p>
+                </div>
+              )}
+              <div className="detail-section">
+                <h3>输出格式</h3>
+                <dl>
+                  <div>
+                    <dt>容器</dt>
+                    <dd>{current.format}</dd>
+                  </div>
+                  <div>
+                    <dt>视频编码</dt>
+                    <dd>{current.video}</dd>
+                  </div>
+                  <div>
+                    <dt>{current.type === "视频" ? "画面尺寸" : "音频编码"}</dt>
+                    <dd>{current.quality}</dd>
+                  </div>
+                </dl>
               </div>
-              <div>
-                <dt>{current.type === "视频" ? "画面尺寸" : "音频编码"}</dt>
-                <dd>{current.quality}</dd>
+              {page === "queue" && (
+                <div className="detail-section group-settings">
+                  <label>
+                    本组保存位置
+                    <input
+                      aria-label="本组保存位置"
+                      placeholder="输入保存目录"
+                      value={activeGroup.outputDir}
+                      onChange={(event) =>
+                        updateGroup(activeGroup.id, {
+                          outputDir: event.target.value,
+                        })
+                      }
+                    />
+                  </label>
+                  <button
+                    className="folder-button"
+                    disabled={!isTauri()}
+                    onClick={() => void chooseOutputDir()}
+                  >
+                    <FolderOpen size={16} />
+                    选择文件夹
+                  </button>
+                  {folderError && <p role="alert">{folderError}</p>}
+                  <p>
+                    仅用于此组；其他分组可选择不同目录。当前只记录路径，不创建文件。
+                  </p>
+                </div>
+              )}
+              <div className="inspector-bottom">
+                <span className="status-dot" />
+                <p>
+                  当前版本
+                  <br />
+                  <strong>基础界面预览</strong>
+                </p>
               </div>
-            </dl>
-          </div>
-          <div className="detail-section">
-            <h3>保存位置</h3>
-            <div className="output-folder">
-              <FolderOpen size={17} />
-              <span>尚未设置</span>
-            </div>
-            <p>导入与输出开放后设置保存目录。</p>
-          </div>
-          <div className="inspector-bottom">
-            <span className="status-dot" />
-            <p>
-              当前版本
-              <br />
-              <strong>基础界面预览</strong>
-            </p>
-          </div>
-        </aside>
+            </aside>
+          </>
+        )}
       </div>
       <footer className="status-bar">
         <span>

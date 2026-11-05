@@ -928,3 +928,34 @@ dd {
   margin-top: 12px;
   width: 100%;
 }
+
+.workspace--details-closed {
+  grid-template-columns: var(--left-width, 190px) 6px minmax(0, 1fr);
+}
+.inspector-title {
+  justify-content: space-between;
+}
+.group-output {
+  padding: 0 20px 10px;
+  font-size: 11px;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+.folder-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px;
+  width: 100%;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 12px;
+}
+@media (max-width: 650px) {
+  .workspace--details-closed {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+}
